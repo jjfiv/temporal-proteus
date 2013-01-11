@@ -258,7 +258,7 @@ import ProteusServlet._
   get("/wordhistory") {
     var actuals = Seq[(String, Any)]()
     if (params.contains("w")) {
-      val words = params("w").split(" ").toList
+      val words = params("w").trim().split(" ").toList
       val response = dataClient.wordFrequencies(words)()
       actuals = ("frequencies" -> response.toMap) +: actuals
       actuals = ("w" -> params("w")) +: actuals
