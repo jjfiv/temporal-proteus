@@ -24,12 +24,11 @@ class Scalatra extends LifeCycle {
     val configuration =  System.getenv("org.scalatra.environment")
     if (configuration == null || configuration.startsWith("dev")) {
       // dev configuration
-      hosts = Site("ayr.cs.umass.edu", 8201) +: hosts
+      hosts = Site("localhost", 8201) +: hosts
     } else {
       // prod configuration
-      hosts = Site("ayr.cs.umass.edu", 8200) +: hosts
+      hosts = Site("localhost", 8200) +: hosts
     }
-
     val servlet = new ProteusServlet
     context.mount(servlet, "/*")
   }
