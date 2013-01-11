@@ -2,10 +2,10 @@ package ciir.proteus.galago
 
 import java.io.File;
 import ciir.proteus._
-import ciir.proteus.galago.thrift.IndexLink
-import ciir.proteus.galago.thrift.Target
+import ciir.proteus.IndexLink
+import ciir.proteus.Target
 import scala.collection.JavaConversions._
-import org.lemurproject.galago.core.index.IndexLinkReader;
+import org.lemurproject.galago.contrib.index.IndexLinkReader;
 import org.lemurproject.galago.tupleflow.Parameters;
 
 object LinkProvider {

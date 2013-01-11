@@ -37,7 +37,8 @@ trait Searchable extends TypedStore {
   def search(srequest : SearchRequest) : List[SearchResult]
 
   def getInfo : Option[CollectionInfo] = {
-    val stats = retrieval.getRetrievalStatistics();
+    return None;
+    /*val stats = retrieval.getRetrievalStatistics();
     val parts = retrieval.getAvailableParts.getKeys().filter {
       partName =>
 	partName.startsWith("field.") && (partName.indexOf("porter") == -1)
@@ -51,6 +52,7 @@ trait Searchable extends TypedStore {
 			       vocabSize = stats.vocabCount,
 			       numTokens = stats.collectionLength,
 			       fields = parts.toList))
+    */
   }
 
   def getDocument(aid: AccessIdentifier) : Option[Document] = {

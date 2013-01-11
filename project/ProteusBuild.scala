@@ -66,13 +66,14 @@ object AuraDeps {
   val finagleThrift = "com.twitter" %% "finagle-thrift" % finagleVer
   val ostrich = "com.twitter" %% "finagle-ostrich4" % finagleVer
   val scroogeRuntime = "com.twitter" %% "scrooge-runtime" % "1.1.3"
-  val galagoCore = "org.lemurproject.galago" % "core" % "3.3-PROTEUS"
-  val galagoTupleflow = "org.lemurproject.galago" % "tupleflow" % "3.3-PROTEUS"
+  val galagoCore = "org.lemurproject.galago" % "core" % "3.4"
+  val galagoContrib = "org.lemurproject.galago" % "contrib" % "3.4"
+  val galagoTupleflow = "org.lemurproject.galago" % "tupleflow" % "3.4"
   val gson = "com.google.code.gson" % "gson" % "2.2.2"
   val logback = "ch.qos.logback" % "logback-classic" % "1.0.7"
 
   def deps = Seq(thriftLib, finagleCore, finagleThrift, ostrich, scroogeRuntime,
-	       galagoCore, galagoTupleflow, gson, logback)
+	       galagoCore, galagoContrib, galagoTupleflow, gson, logback)
 }
 
 object MorpheusDeps {
@@ -83,8 +84,8 @@ object MorpheusDeps {
   val logback = "ch.qos.logback" % "logback-classic" % "1.0.7"
   val jetty = "org.eclipse.jetty" % "jetty-webapp" % "8.1.7.v20120910" % "container"
   val jettyOrbit = "org.eclipse.jetty.orbit" % "javax.servlet" % "3.0.0.v201112011016" % "container;provided;test" artifacts (Artifact("javax.servlet", "jar", "jar"))
-  val galagoCore = "org.lemurproject.galago" % "core" % "3.3-PROTEUS"
-  val galagoTupleflow = "org.lemurproject.galago" % "tupleflow" % "3.3-PROTEUS"
+  val galagoCore = "org.lemurproject.galago" % "core" % "3.4"
+  val galagoTupleflow = "org.lemurproject.galago" % "tupleflow" % "3.4"
   val liftjson = "net.liftweb" %% "lift-json" % "2.4"
   val casbah = "org.mongodb" %% "casbah" % "2.4.1"
   def deps = Seq(scalatra, scalate, scalatraSpecs2, logback, jetty, jettyOrbit,
