@@ -212,6 +212,35 @@ import ProteusServlet._
     renderHTML("lookup", "result" -> splitResults)
   }
 
+  get("/searchhistory") {
+    var actuals = Seq[(String,Any)]()
+    
+    if (params.contains("q")) {
+      val wordQuery = params("q");
+      var count = kNumSearchResults
+      if(params.contains("n")) {
+        count = params("n").toInt
+      }
+
+      val request = SearchRequest(
+          rawQuery=wordQuery,
+          types = List(ProteusType.Collection),
+          parameters = Some(RequestParameters(count, 0)),
+          rawGalagoQuery = None )
+
+      val hits = dataClient.search(request)().results
+      val objs = dataClient.lookup(LookupRequest(hits.map(_.id)))().objects
+
+      val results = objs.map(_.collection).filter(_.isDefined).map(_.get.publicationDate).filter(_.isDefined).map(_.get)
+
+      //val emptyFreqData = Map[String, LongValueList](wordQuery -> new LongValueList(dates=Seq()))
+      //actuals = ("frequencies" -> emptyFreqData ) +: actuals
+      actuals = ("debug" -> results.toString) +: actuals
+      actuals = ("q" -> wordQuery) +: actuals
+    }
+    renderHTML("searchhistory", actuals:_*)
+  }
+
   get("/search") {
     var actuals = Seq[(String, Any)]() 
     
