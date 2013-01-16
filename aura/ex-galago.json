@@ -1,0 +1,31 @@
+{
+  "adapter":"galago",
+  "port":8201,
+  "siteId":"portland",
+  "index":"/home/example/path/data/portland/topics",
+  "linkDirectory":"/home/example/path/data/portland/links",
+  "dateDirectory":"/home/example/path/data/portland/dates",
+  "handlers":{
+    "topic" : {
+      "index" : "/home/example/path/data/portland/topics"
+    },
+    "page" : {
+      "index" : "/home/example/path/data/portland/pages"
+    },
+    "collection" : {
+      "index" : "/home/example/path/data/portland/books"
+    },
+    "person" : {
+      "index" : "/home/example/path/data/portland/people"
+    },
+    "location" : {
+      "index" : "/home/example/path/data/portland/locations"
+    },
+    "miscellaneous" : {
+      "index" : "/home/example/path/data/portland/misc"
+    },
+    "picture" : {
+      "index" : "/home/example/path/data/portland/pictures"
+    }
+  }
+}
