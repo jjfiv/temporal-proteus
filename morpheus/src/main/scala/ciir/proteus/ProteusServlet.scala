@@ -228,14 +228,11 @@ import ProteusServlet._
           parameters = Some(RequestParameters(count, 0)),
           rawGalagoQuery = None )
 
-      val hits = dataClient.search(request)().results
-      val objs = dataClient.lookup(LookupRequest(hits.map(_.id)))().objects
-
-      val results = objs.map(_.collection).filter(_.isDefined).map(_.get.publicationDate).filter(_.isDefined).map(_.get)
-
+      val hits = dataClient.searchHistory(request)().results
+      
       //val emptyFreqData = Map[String, LongValueList](wordQuery -> new LongValueList(dates=Seq()))
       //actuals = ("frequencies" -> emptyFreqData ) +: actuals
-      actuals = ("debug" -> results.toString) +: actuals
+      actuals = ("debug" -> hits.toString) +: actuals
       actuals = ("q" -> wordQuery) +: actuals
     }
     renderHTML("searchhistory", actuals:_*)

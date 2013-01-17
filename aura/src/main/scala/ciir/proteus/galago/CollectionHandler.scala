@@ -32,20 +32,21 @@ with Searchable {
   val archiveReaderUrl = "http://archive.org/stream"
   val retrieval = RetrievalFactory.instance(parameters)
   val retrievalType = ProteusType.Collection
+    
+  val cParms = new Parameters;
+  cParms.set("terms", false);
+  cParms.set("tags", false);
 
   override def search(srequest: SearchRequest): List[SearchResult] = {
     val (root, scored) = runQueryAgainstIndex(srequest)
     if (scored == null) return List()
     val queryTerms = StructuredQuery.findQueryTerms(root).toSet;
     generator.setStemming(root.toString().contains("part=stemmedPostings"));
-    val c = new Parameters;
-    c.set("terms", false);
-    c.set("tags", false);
     var results = ListBuffer[SearchResult]()
     for (scoredDocument <- scored) {
       val identifier = scoredDocument.documentName;
        try {
-      val document = retrieval.getDocument(identifier, c);
+      val document = retrieval.getDocument(identifier, cParms);
       val accessId = AccessIdentifier(identifier = identifier, 
 				      `type` = ProteusType.Collection, 
 				      resourceId = siteId)
@@ -75,17 +76,16 @@ with Searchable {
     return results.toList
   }
 
+  def getMetadata(id: AccessIdentifier) = retrieval.getDocument(id.identifier, cParms).metadata
+
   override def lookup(id: AccessIdentifier) : ProteusObject =
     getCollectionObject(id)
 
   override def lookup(ids: Set[AccessIdentifier]): List[ProteusObject] = 
     ids.map { id => getCollectionObject(id) }.filter { A => A != null }.toList
 
-  val c = new Parameters;
-  c.set("terms", true);
-  c.set("tags", true);    
   private def getCollectionObject(id: AccessIdentifier) : ProteusObject = {
-    val document = retrieval.getDocument(id.identifier, c)
+    val document = retrieval.getDocument(id.identifier, cParms)
     if (document == null) return null
     val creatorList = new ListBuffer[String]
     var publicationD = None

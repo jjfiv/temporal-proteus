@@ -285,6 +285,17 @@ struct SearchResponse {
   2: optional string error,
 }
 
+struct SearchHistoryResult {
+  1: AccessIdentifier id,
+  2: i32 year,
+  3: double weight;
+}
+
+struct SearchHistoryResponse {
+  1: list<SearchHistoryResult> results,
+  2: optional string error,
+}
+
 enum TransformType {
   TO_CONTAINER = 0,
   TO_CONTENTS = 1,
@@ -354,6 +365,7 @@ struct StatusResponse {
 
 service ProteusProvider {
   SearchResponse search(1:SearchRequest srequest),
+  SearchHistoryResponse searchHistory(1: SearchRequest srequest),
   LookupResponse lookup(1:LookupRequest lrequest),
   TransformResponse transform(1:TransformRequest trequest),
   SearchResponse related(1:RelatedRequest rrequest),

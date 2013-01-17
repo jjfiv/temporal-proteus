@@ -95,6 +95,28 @@ extends ProteusProvider.FutureIface {
     return Future(SearchResponse(results = resultList, error = None))
   }
 
+  override def searchHistory(srequest: SearchRequest): Future[SearchHistoryResponse] = {
+    val start = System.currentTimeMillis
+	
+    // search Collection only for now
+    val collection = handlerMap(ProteusType.Collection).asInstanceOf[CollectionHandler]
+    val results = collection.search(srequest).map(sr => {
+      val id = sr.id
+      val score = sr.score
+      val year = collection.getMetadata(id).getOrElse("date", "-1").toInt
+      if (year > 0) {
+        Some(SearchHistoryResult( id = sr.id, year = year, weight = sr.score))
+      } else {
+        None
+      }
+    }).flatten
+
+
+    val end = System.currentTimeMillis
+    Console.printf("Retrieval took a total of %s ms\n", end-start)
+    return Future(SearchHistoryResponse(results = results, error = None))
+  }
+
   override def lookup(lrequest: LookupRequest): Future[LookupResponse] = {
     val foundObjects : Set[List[ProteusObject]]= handlerKeys.map {
       key: ProteusType => {
