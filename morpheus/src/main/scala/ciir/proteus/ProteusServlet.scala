@@ -213,6 +213,7 @@ import ProteusServlet._
   }
 
   get("/searchhistory") {
+    val start = System.currentTimeMillis
     var actuals = Seq[(String,Any)]()
     
     if (params.contains("q")) {
@@ -226,16 +227,26 @@ import ProteusServlet._
           rawQuery=wordQuery,
           types = List(ProteusType.Collection),
           parameters = Some(RequestParameters(count, 0)),
-          rawGalagoQuery = None )
+          rawGalagoQuery = params("rgq") match {
+            case "" => None
+            case str => Some(str)
+          })
 
-      val hits = dataClient.searchHistory(request)().results
+      val auraReq = dataClient.searchHistory(request)
+      Console.println("aura req sent: " + (System.currentTimeMillis - start)+"ms");
+      val hits = auraReq().results
+      Console.println("aura resp recvd: " + (System.currentTimeMillis - start)+"ms");
       
       //val emptyFreqData = Map[String, LongValueList](wordQuery -> new LongValueList(dates=Seq()))
       //actuals = ("frequencies" -> emptyFreqData ) +: actuals
       actuals = ("debug" -> hits.toString) +: actuals
       actuals = ("q" -> wordQuery) +: actuals
+      actuals = ("rgq" -> params("rgq")) +: actuals
     }
-    renderHTML("searchhistory", actuals:_*)
+    val startRender = System.currentTimeMillis
+    val result = renderHTML("searchhistory", actuals:_*)
+    Console.println("render time: " + (System.currentTimeMillis-startRender)+"ms")
+    result
   }
 
   get("/search") {

@@ -76,7 +76,30 @@ with Searchable {
     return results.toList
   }
 
-  def getMetadata(id: AccessIdentifier) = retrieval.getDocument(id.identifier, cParms).metadata
+  def searchHistory(srequest: SearchRequest): List[SearchHistoryResult] = {
+    var scored = Array[ScoredDocument]()
+    
+    try {
+      val (root, actual) = runQueryAgainstIndex(srequest)
+      scored = actual
+  
+      Console.printf("Search completed with transformed query: `%s'\n", root)
+    } catch {
+      case ex: java.lang.reflect.InvocationTargetException => {
+        Console.println(ex)
+        ex.printStackTrace()
+      }
+    }
+
+    scored.toList.flatMap(doc => {
+      val year = retrieval.getDocument(doc.documentName, cParms).metadata.getOrElse("date", "-1").toInt
+      if (year > 0) {
+        Some(SearchHistoryResult(year = year, weight = doc.score))
+      } else { None }
+    })
+
+  }
+  
 
   override def lookup(id: AccessIdentifier) : ProteusObject =
     getCollectionObject(id)

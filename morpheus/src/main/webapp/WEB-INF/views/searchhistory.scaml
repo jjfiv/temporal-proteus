@@ -1,21 +1,24 @@
 - import ciir.proteus.ProteusFunctions._
 - import ciir.proteus._
 -@ val q : String = ""
+-@ val rgq: String = ""
 -@ val frequencies : Map[String, LongValueList] = Map()
 -@ val debug : String = ""
 -@ val error : String = ""
+%script(src="assets/js/highcharts/highstock.js")
 .container-fluid
  .row-fluid
   %form.well.form-search#wordForm(method="get" action="searchhistory")
    %div
-    %input.input-medium.search-query#w(type="text" name="q" value={q}
+    %input.input-medium.search-query#q(type="text" name="q" value={q}
     				       placeholder="Enter Term")
+    %textarea#rgq(name="rgq" placeholder="Enter Galago Query") #{rgq}
     %button.btn.btn-primary(type="submit") Look
-    %script(src="assets/js/highcharts/highstock.js")
+   %div
    %div '#{debug}'
   - if (!frequencies.isEmpty)
    %div
-    %h1 Frequencies for '#{q}'
+    %h1 Frequencies for '#{q}' '#{rgq}'
    %hr
    %div#wordFreqs
    - val data = prepareHighStockData(frequencies)

@@ -286,9 +286,9 @@ struct SearchResponse {
 }
 
 struct SearchHistoryResult {
-  1: AccessIdentifier id,
-  2: i32 year,
-  3: double weight;
+  //1: string id,
+  1: i32 year,
+  2: double weight;
 }
 
 struct SearchHistoryResponse {

@@ -86,6 +86,9 @@ trait Searchable extends TypedStore {
       case None => rawQueryToGalagoQuery(srequest.rawQuery)
       case Some(result) => result
     }
+
+    Console.println(galagoQuery);
+
    
     val root = StructuredQuery.parse(galagoQuery);
     val transformed : Node = retrieval.transformQuery(root, searchParams);

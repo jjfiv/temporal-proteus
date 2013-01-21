@@ -24,8 +24,7 @@ import org.slf4j.{Logger, LoggerFactory}
 // 3) Collecting the responses from each server and composing them as a single 
 //    response to the sender
 // 4) reports status on the health of the component indexes
-class GalagoAdapter(parameters: Parameters) 
-extends ProteusProvider.FutureIface {
+class GalagoAdapter(parameters: Parameters) extends ProteusProvider.FutureIface {
   // Construction
   val logger = LoggerFactory.getLogger(this.getClass)
   val siteIdentifier = parameters.getString("siteId")
@@ -36,21 +35,21 @@ extends ProteusProvider.FutureIface {
       val handlerParameters = handlersSection.getMap(key)
       handlerParameters.set("siteId", siteIdentifier)      
       ProteusType.valueOf(key) match {
-	case None => System.err.printf("'%s' is not a valid handler key.\n", key)
-	case Some(pKey: ProteusType) => {
-	  Handler(pKey, handlerParameters) match {
-	    case Some(h: Handler) => {
-	      hBuilder += (pKey -> h)
-	      System.out.printf("Loaded handler '%s'\n", key)
-	    }
-	    case None => System.err.printf("Not handling '%s' yet.\n", key)
-	  }
-	}
+        case None => System.err.printf("'%s' is not a valid handler key.\n", key)
+        case Some(pKey: ProteusType) => {
+          Handler(pKey, handlerParameters) match {
+            case Some(h: Handler) => {
+              hBuilder += (pKey -> h)
+              System.out.printf("Loaded handler '%s'\n", key)
+            }
+            case None => System.err.printf("Not handling '%s' yet.\n", key)
+          }
+        }
       }
     } catch {
       case e => System.err.printf("Unable to load handler '%s': %s\n",
-				  key,
-				  e.getMessage)
+        key,
+        e.getMessage)
     }
   }
   val handlerMap: Map[ProteusType, Handler] = hBuilder.result
@@ -66,28 +65,28 @@ extends ProteusProvider.FutureIface {
     // asked for
     val picHandler : PictureHandler = handlerMap(ProteusType.Picture).asInstanceOf[PictureHandler]
     val picResults =
-      if (activeKeys(ProteusType.Picture) && !activeKeys(ProteusType.Page)) {
-	val pageResults = handlerMap(ProteusType.Page).asInstanceOf[Searchable].search(srequest)
-	picHandler.scorePictures(pageResults).toList
-      } else {
-	List()
-      }
+    if (activeKeys(ProteusType.Picture) && !activeKeys(ProteusType.Page)) {
+     val pageResults = handlerMap(ProteusType.Page).asInstanceOf[Searchable].search(srequest)
+     picHandler.scorePictures(pageResults).toList
+     } else {
+       List()
+     }
 
-    val start = System.currentTimeMillis
-    var resultsSet = activeKeys.map { 
+     val start = System.currentTimeMillis
+     var resultsSet = activeKeys.map { 
       key: ProteusType => handlerMap(key) match {
-	case s:Searchable => {
-	  var results = s.search(srequest)
-	  if (activeKeys(ProteusType.Picture) &&
-	      key == ProteusType.Page) {
-	    (results ++ picHandler.scorePictures(results)).toList
-	  } else {
-	    results
-	  }
-	}
-	case _ => List()
-      }
-    }
+       case s:Searchable => {
+         var results = s.search(srequest)
+         if (activeKeys(ProteusType.Picture) &&
+           key == ProteusType.Page) {
+           (results ++ picHandler.scorePictures(results)).toList
+           } else {
+             results
+           }
+         }
+         case _ => List()
+       }
+     }
     val end = System.currentTimeMillis
     Console.printf("Retrieval took a total of %s ms\n", end-start)
     resultsSet = resultsSet + picResults    
@@ -100,17 +99,7 @@ extends ProteusProvider.FutureIface {
 	
     // search Collection only for now
     val collection = handlerMap(ProteusType.Collection).asInstanceOf[CollectionHandler]
-    val results = collection.search(srequest).map(sr => {
-      val id = sr.id
-      val score = sr.score
-      val year = collection.getMetadata(id).getOrElse("date", "-1").toInt
-      if (year > 0) {
-        Some(SearchHistoryResult( id = sr.id, year = year, weight = sr.score))
-      } else {
-        None
-      }
-    }).flatten
-
+    val results = collection.searchHistory(srequest)
 
     val end = System.currentTimeMillis
     Console.printf("Retrieval took a total of %s ms\n", end-start)
