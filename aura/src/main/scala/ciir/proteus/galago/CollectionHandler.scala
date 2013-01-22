@@ -76,11 +76,11 @@ with Searchable {
     return results.toList
   }
 
-  def searchHistory(srequest: SearchRequest): List[SearchHistoryResult] = {
+  def searchHistory(req: WordHistoryRequest): List[SearchHistoryResult] = {
     var scored = Array[ScoredDocument]()
     
     try {
-      val (root, actual) = runQueryAgainstIndex(srequest)
+      val (root, actual) = WordHistory.runQuery(retrieval, req.query, req.count)
       scored = actual
   
       Console.printf("Search completed with transformed query: `%s'\n", root)
@@ -92,14 +92,17 @@ with Searchable {
     }
 
     scored.toList.flatMap(doc => {
-      val year = retrieval.getDocument(doc.documentName, cParms).metadata.getOrElse("date", "-1").toInt
-      if (year > 0) {
-        Some(SearchHistoryResult(year = year, weight = doc.score))
-      } else { None }
+      if(doc.score == 0) {
+        None
+      } else {
+        val year = retrieval.getDocument(doc.documentName, cParms).metadata.getOrElse("date", "-1").replace("[^0-9]","").toInt
+        if (year > 0) {
+          Some(SearchHistoryResult(name=doc.documentName, year = year, weight = doc.score))
+        } else { None }
+      }
     })
 
   }
-  
 
   override def lookup(id: AccessIdentifier) : ProteusObject =
     getCollectionObject(id)

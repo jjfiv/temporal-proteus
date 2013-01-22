@@ -1,7 +1,6 @@
 - import ciir.proteus.ProteusFunctions._
 - import ciir.proteus._
 -@ val q : String = ""
--@ val rgq: String = ""
 -@ val frequencies : Map[String, LongValueList] = Map()
 -@ val debug : String = ""
 -@ val error : String = ""
@@ -12,31 +11,27 @@
    %div
     %input.input-medium.search-query#q(type="text" name="q" value={q}
     				       placeholder="Enter Term")
-    %textarea#rgq(name="rgq" placeholder="Enter Galago Query") #{rgq}
     %button.btn.btn-primary(type="submit") Look
-   %div
    %div '#{debug}'
-  - if (!frequencies.isEmpty)
    %div
-    %h1 Frequencies for '#{q}' '#{rgq}'
+    %h1 Frequencies for '#{q}'
    %hr
    %div#wordFreqs
-   - val data = prepareHighStockData(frequencies)
    :!javascript
     var chart1; // globally available
     $(document).ready(function() {
-      chart1 = new Highcharts.StockChart({
+      chart1 = new Highcharts.Chart({
          chart: {
-            renderTo: 'wordFreqs',
+           renderTo: 'wordFreqs',
+           type: 'line'
          },
          rangeSelector: { enabled : false },
          scrollbar : { enabled: false },
          navigator : { enabled: false },
          legend : { enabled: true },
-         tooltip: { xDateFormat: '%Y' },
          title: {
             text: 'Word Use Over Time'
          },
-         series: [#{data}]         
+         series: [{name: "test", data:[[1910,14],[1913,15]]}]         
       });
     });

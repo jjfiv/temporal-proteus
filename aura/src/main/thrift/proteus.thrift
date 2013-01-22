@@ -285,10 +285,15 @@ struct SearchResponse {
   2: optional string error,
 }
 
+struct WordHistoryRequest {
+  1: string query,
+  2: i32 count;
+}
+
 struct SearchHistoryResult {
-  //1: string id,
-  1: i32 year,
-  2: double weight;
+  1: string name,
+  2: i32 year,
+  3: double weight;
 }
 
 struct SearchHistoryResponse {
@@ -365,7 +370,7 @@ struct StatusResponse {
 
 service ProteusProvider {
   SearchResponse search(1:SearchRequest srequest),
-  SearchHistoryResponse searchHistory(1: SearchRequest srequest),
+  SearchHistoryResponse searchHistory(1: WordHistoryRequest whrequest),
   LookupResponse lookup(1:LookupRequest lrequest),
   TransformResponse transform(1:TransformRequest trequest),
   SearchResponse related(1:RelatedRequest rrequest),

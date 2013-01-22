@@ -90,15 +90,15 @@ object ProteusFunctions {
   def prepareHighStockData(frequencies: Map[String, LongValueList]) : String = {
     frequencies.toList.map {
       entry => {
-	val (name, values) = entry
-	val valueStrings = values.dates.map {
-	  weightedDate => {
-	    calendar.set(weightedDate.date.toInt, 1, 1)
-	    "[%d,%f]" format (calendar.getTimeInMillis, weightedDate.weight)
-	  }
-	}.mkString(",")
-	"{name: '%s', data: [%s]}" format (name, valueStrings)
-      }
+        val (name, values) = entry
+        val valueStrings = values.dates.map {
+          weightedDate => {
+            calendar.set(weightedDate.date.toInt, 1, 1)
+            "[%d,%f]" format (calendar.getTimeInMillis, weightedDate.weight)
+          }
+        }.mkString(",")
+        "{name: '%s', data: [%s]}" format (name, valueStrings)
+        }
     }.mkString(",")
   }
 

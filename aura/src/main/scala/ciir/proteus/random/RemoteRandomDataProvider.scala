@@ -16,7 +16,7 @@ class RemoteRandomDataProvider extends ProteusProvider.FutureIface with FakeData
     return Future(SearchResponse(results, None))
   }
 
-  override def searchHistory(srequest: SearchRequest): Future[SearchHistoryResponse] = {
+  override def searchHistory(req: WordHistoryRequest): Future[SearchHistoryResponse] = {
     return Future(SearchHistoryResponse(List(), None))
   }
 

@@ -94,12 +94,12 @@ class GalagoAdapter(parameters: Parameters) extends ProteusProvider.FutureIface 
     return Future(SearchResponse(results = resultList, error = None))
   }
 
-  override def searchHistory(srequest: SearchRequest): Future[SearchHistoryResponse] = {
+  override def searchHistory(req: WordHistoryRequest): Future[SearchHistoryResponse] = {
     val start = System.currentTimeMillis
 	
     // search Collection only for now
     val collection = handlerMap(ProteusType.Collection).asInstanceOf[CollectionHandler]
-    val results = collection.searchHistory(srequest)
+    val results = collection.searchHistory(req)
 
     val end = System.currentTimeMillis
     Console.printf("Retrieval took a total of %s ms\n", end-start)
