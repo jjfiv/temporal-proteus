@@ -103,20 +103,13 @@ object ProteusFunctions {
   }
 
   def wordHistoryResultsToJS(q: String, res: Seq[WordHistoryResult]): String = {
-    val keys: Set[Int] = res.map(x=>x.year).toSet
-    val mmap = collection.mutable.Map[Int,Int]() ++ keys.view.map((_,0))
-
-    for ( r <- res ) {
-      mmap(r.year) += r.weight
+    //sort the data by year, increasing, and output it for Javascript
+    
+    val data = for (r <- res.sortBy(_.year)) yield {
+      "{id:\""+r.name+"\",year:"+r.year+",weight:"+r.weight+"}"
     }
 
-    val pairs = mmap.toSeq.sortBy(_._1)
-
-    val points = (for( (k,v) <- pairs) yield {
-      "["+k.toString+","+v.toString+"]"
-    }).mkString(",")
-
-    "{name:\""+q+"\", data:["+points+"]}";
+    "{name:\""+q+"\",raw:["+data.mkString(",")+"]}"
   }
 
   def normalizeText(name:String):String = {

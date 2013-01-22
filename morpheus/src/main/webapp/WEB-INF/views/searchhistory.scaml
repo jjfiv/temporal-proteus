@@ -5,7 +5,7 @@
 -@ val debug : String = ""
 -@ val error : String = ""
 :!javascript
- var resultData = #{wordHistoryResultsToJS(q, results)}
+ var resultData = [#{wordHistoryResultsToJS(q, results)}]
 %script(src="assets/js/highcharts/highstock.js")
 %script(src="assets/js/proteus/wordhistory.js")
 .container-fluid
