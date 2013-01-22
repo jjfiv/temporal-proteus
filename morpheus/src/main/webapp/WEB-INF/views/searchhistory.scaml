@@ -4,7 +4,10 @@
 -@ val results : Seq[WordHistoryResult] = List()
 -@ val debug : String = ""
 -@ val error : String = ""
+:!javascript
+ var resultData = #{wordHistoryResultsToJS(q, results)}
 %script(src="assets/js/highcharts/highstock.js")
+%script(src="assets/js/proteus/wordhistory.js")
 .container-fluid
  .row-fluid
   %form.well.form-search#wordForm(method="get" action="searchhistory")
@@ -12,32 +15,8 @@
     %input.input-medium.search-query#q(type="text" name="q" value={q}
     				       placeholder="Enter Term")
     %button.btn.btn-primary(type="submit") Look
-   %div '#{debug}'
    %div
     %h1 Frequencies for '#{q}'
    %hr
    %div#wordFreqs
-   :!javascript
-    var chart1; // globally available
-    $(document).ready(function() {
-      chart1 = new Highcharts.Chart({
-         chart: {
-           renderTo: 'wordFreqs',
-           type: 'line'
-         },
-         rangeSelector: { enabled : false },
-         scrollbar : { enabled: false },
-         navigator : { enabled: false },
-         legend : { enabled: true },
-         title: {
-           text: 'Word Use Over Time'
-         },
-         xAxis: {
-           allowDecimals: false
-         },
-         yAxis: {
-           allowDecimals: false
-         },
-         series: [#{wordHistoryResultsToJS(q, results)}]
-      });
-    });
+

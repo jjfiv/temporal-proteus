@@ -226,7 +226,6 @@ import ProteusServlet._
       Console.println("aura resp recvd: " + (System.currentTimeMillis - start)+"ms");
       
       actuals = ("results" -> hits) +: actuals
-      //actuals = ("debug" -> wordHistoryResultsToJS(wordQuery, hits)) +: actuals
       actuals = ("q" -> wordQuery) +: actuals
     }
 
