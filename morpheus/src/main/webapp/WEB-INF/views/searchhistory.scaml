@@ -1,7 +1,7 @@
-- import ciir.proteus.ProteusFunctions._
 - import ciir.proteus._
+- import ProteusFunctions._
 -@ val q : String = ""
--@ val frequencies : Map[String, LongValueList] = Map()
+-@ val results : Seq[WordHistoryResult] = List()
 -@ val debug : String = ""
 -@ val error : String = ""
 %script(src="assets/js/highcharts/highstock.js")
@@ -32,6 +32,6 @@
          title: {
             text: 'Word Use Over Time'
          },
-         series: [{name: "test", data:[[1910,14],[1913,15]]}]         
+         series: #{wordHistoryResultsToJS(q, results)}         
       });
     });

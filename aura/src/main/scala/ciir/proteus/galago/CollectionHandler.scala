@@ -76,7 +76,7 @@ with Searchable {
     return results.toList
   }
 
-  def searchHistory(req: WordHistoryRequest): List[SearchHistoryResult] = {
+  def searchHistory(req: WordHistoryRequest): List[WordHistoryResult] = {
     var scored = Array[ScoredDocument]()
     
     try {
@@ -91,17 +91,24 @@ with Searchable {
       }
     }
 
-    scored.toList.flatMap(doc => {
+    val start = System.currentTimeMillis
+
+    val results = scored.toList.flatMap(doc => {
       if(doc.score == 0) {
         None
       } else {
         val year = retrieval.getDocument(doc.documentName, cParms).metadata.getOrElse("date", "-1").replace("[^0-9]","").toInt
         if (year > 0) {
-          Some(SearchHistoryResult(name=doc.documentName, year = year, weight = doc.score))
+          Some(WordHistoryResult(name=doc.documentName, year = year, weight = doc.score.toInt))
         } else { None }
       }
     })
 
+    val end = System.currentTimeMillis
+
+    Console.printf("Date metadata lookup for %d results took %d ms\n", results.length, end-start)
+
+    results
   }
 
   override def lookup(id: AccessIdentifier) : ProteusObject =

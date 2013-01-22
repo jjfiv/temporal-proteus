@@ -290,14 +290,14 @@ struct WordHistoryRequest {
   2: i32 count;
 }
 
-struct SearchHistoryResult {
+struct WordHistoryResult {
   1: string name,
   2: i32 year,
-  3: double weight;
+  3: i32 weight;
 }
 
 struct SearchHistoryResponse {
-  1: list<SearchHistoryResult> results,
+  1: list<WordHistoryResult> results,
   2: optional string error,
 }
 
