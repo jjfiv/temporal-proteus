@@ -218,14 +218,9 @@ import ProteusServlet._
     
     if (params.contains("q")) {
       val wordQuery = params("q");
-      var count = kNumSearchResults
-      if(params.contains("n")) {
-        count = params("n").toInt
-      }
+      val request = WordHistoryRequest(query = wordQuery)
 
-      val request = WordHistoryRequest( query = wordQuery, count = count )
-
-      val auraReq = dataClient.searchHistory(request)
+      val auraReq = dataClient.wordHistory(request)
       Console.println("aura req sent: " + (System.currentTimeMillis - start)+"ms");
       val hits = auraReq().results
       Console.println("aura resp recvd: " + (System.currentTimeMillis - start)+"ms");

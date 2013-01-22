@@ -30,11 +30,10 @@ object WordHistory {
     "#feature:class="+classOf[RawScoreIter].getName()+"("+cleanQuery+")"
   }
 
-  def runQuery(retrieval: Retrieval, request: String, count: Int): Tuple2[Node, Array[ScoredDocument]] = {
+  def runQuery(retrieval: Retrieval, request: String): Tuple2[Node, Array[ScoredDocument]] = {
     val galagoQuery = formatQuery(request)
     
     val searchParams = new Parameters
-    searchParams.set("count", count)
 
     val root = StructuredQuery.parse(galagoQuery)
     val transformed: Node = retrieval.transformQuery(root, searchParams)

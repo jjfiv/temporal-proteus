@@ -116,7 +116,7 @@ object ProteusFunctions {
       "["+k.toString+","+v.toString+"]"
     }).mkString(",")
 
-    "[{name:\""+q+"\", data:["+points+"]}]";
+    "{name:\""+q+"\", data:["+points+"]}";
   }
 
   def normalizeText(name:String):String = {

@@ -287,7 +287,6 @@ struct SearchResponse {
 
 struct WordHistoryRequest {
   1: string query,
-  2: i32 count;
 }
 
 struct WordHistoryResult {
@@ -296,9 +295,8 @@ struct WordHistoryResult {
   3: i32 weight;
 }
 
-struct SearchHistoryResponse {
+struct WordHistoryResponse {
   1: list<WordHistoryResult> results,
-  2: optional string error,
 }
 
 enum TransformType {
@@ -370,7 +368,7 @@ struct StatusResponse {
 
 service ProteusProvider {
   SearchResponse search(1:SearchRequest srequest),
-  SearchHistoryResponse searchHistory(1: WordHistoryRequest whrequest),
+  WordHistoryResponse wordHistory(1: WordHistoryRequest whrequest),
   LookupResponse lookup(1:LookupRequest lrequest),
   TransformResponse transform(1:TransformRequest trequest),
   SearchResponse related(1:RelatedRequest rrequest),

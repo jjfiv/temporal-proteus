@@ -76,11 +76,11 @@ with Searchable {
     return results.toList
   }
 
-  def searchHistory(req: WordHistoryRequest): List[WordHistoryResult] = {
+  def wordHistory(req: WordHistoryRequest): List[WordHistoryResult] = {
     var scored = Array[ScoredDocument]()
     
     try {
-      val (root, actual) = WordHistory.runQuery(retrieval, req.query, req.count)
+      val (root, actual) = WordHistory.runQuery(retrieval, req.query)
       scored = actual
   
       Console.printf("Search completed with transformed query: `%s'\n", root)

@@ -30,8 +30,14 @@
          navigator : { enabled: false },
          legend : { enabled: true },
          title: {
-            text: 'Word Use Over Time'
+           text: 'Word Use Over Time'
          },
-         series: #{wordHistoryResultsToJS(q, results)}         
+         xAxis: {
+           allowDecimals: false
+         },
+         yAxis: {
+           allowDecimals: false
+         },
+         series: [#{wordHistoryResultsToJS(q, results)}]
       });
     });
