@@ -102,7 +102,7 @@ object ProteusFunctions {
     }.mkString(",")
   }
 
-  def wordHistoryResultsToJS(q: String, res: Seq[WordHistoryResult]): String = {
+  private def wordHistoryQueryToJS(q: String, res: Seq[WordHistoryResult]): String = {
     //sort the data by year, increasing, and output it for Javascript
     
     val data = for (r <- res.sortBy(_.year)) yield {
@@ -110,6 +110,12 @@ object ProteusFunctions {
     }
 
     "{name:\""+q+"\",raw:["+data.mkString(",")+"]}"
+  }
+
+  def wordHistoryResultsToJS(qr: Seq[(String, Seq[WordHistoryResult])]): String = {
+    val objs = for( (q, res) <- qr ) yield { wordHistoryQueryToJS(q, res) }
+
+    "["+objs.mkString(",")+"]"
   }
 
   def normalizeText(name:String):String = {

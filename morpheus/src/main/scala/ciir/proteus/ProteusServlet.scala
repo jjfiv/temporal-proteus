@@ -215,18 +215,21 @@ import ProteusServlet._
   get("/searchhistory") {
     val start = System.currentTimeMillis
     var actuals = Seq[(String,Any)]()
-    
-    if (params.contains("q")) {
-      val wordQuery = params("q");
-      val request = WordHistoryRequest(query = wordQuery)
 
-      val auraReq = dataClient.wordHistory(request)
-      Console.println("aura req sent: " + (System.currentTimeMillis - start)+"ms");
-      val hits = auraReq().results
-      Console.println("aura resp recvd: " + (System.currentTimeMillis - start)+"ms");
-      
-      actuals = ("results" -> hits) +: actuals
-      actuals = ("q" -> wordQuery) +: actuals
+    if (params.contains("qs")) {
+      val multiple = params("qs").split(",").toList.map(_.trim).filter(_.length != 0)
+
+      val futures = multiple.map(q => {
+        dataClient.wordHistory(WordHistoryRequest(query = q))
+      });
+
+      // time consuming step here...
+      val results = futures.map(_().results)
+
+      val resultJS = wordHistoryResultsToJS((multiple zip results))
+
+      actuals +:= ("qs", multiple)
+      actuals +:= ("results", resultJS)
     }
 
     val startRender = System.currentTimeMillis
