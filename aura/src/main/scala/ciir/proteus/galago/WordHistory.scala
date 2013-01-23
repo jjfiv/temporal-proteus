@@ -50,5 +50,6 @@ object WordHistory {
 
     Tuple2(transformed, scored)
   }
+
 }
 

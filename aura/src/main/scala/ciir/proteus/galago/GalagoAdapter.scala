@@ -103,7 +103,7 @@ class GalagoAdapter(parameters: Parameters) extends ProteusProvider.FutureIface 
 
     val end = System.currentTimeMillis
     Console.printf("Retrieval took a total of %s ms\n", end-start)
-    return Future(WordHistoryResponse(results = results))
+    return Future(results)
   }
 
   override def lookup(lrequest: LookupRequest): Future[LookupResponse] = {

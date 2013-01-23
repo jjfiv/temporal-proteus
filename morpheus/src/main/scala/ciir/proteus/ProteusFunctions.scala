@@ -112,7 +112,7 @@ object ProteusFunctions {
     "{name:\""+q+"\",raw:["+data.mkString(",")+"]}"
   }
 
-  def wordHistoryResultsToJS(qr: Seq[(String, Seq[WordHistoryResult])]): String = {
+  def wordHistoryResultsToJS(qr: scala.collection.Map[String, Seq[WordHistoryResult]]): String = {
     val objs = for( (q, res) <- qr ) yield { wordHistoryQueryToJS(q, res) }
 
     "["+objs.mkString(",")+"]"

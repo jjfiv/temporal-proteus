@@ -217,18 +217,16 @@ import ProteusServlet._
     var actuals = Seq[(String,Any)]()
 
     if (params.contains("qs")) {
-      val multiple = params("qs").split(",").toList.map(_.trim).filter(_.length != 0)
+      val qs = params("qs").split(",").toList.map(_.trim).filter(_.length != 0)
 
-      val futures = multiple.map(q => {
-        dataClient.wordHistory(WordHistoryRequest(query = q))
-      });
-
+      val future = dataClient.wordHistory(WordHistoryRequest(queries = qs))
+      
       // time consuming step here...
-      val results = futures.map(_().results)
+      val results = future().results
 
-      val resultJS = wordHistoryResultsToJS((multiple zip results))
+      val resultJS = wordHistoryResultsToJS(results)
 
-      actuals +:= ("qs", multiple)
+      actuals +:= ("qs", qs)
       actuals +:= ("results", resultJS)
     }
 

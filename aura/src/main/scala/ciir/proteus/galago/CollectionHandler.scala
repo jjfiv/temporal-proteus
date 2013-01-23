@@ -76,21 +76,53 @@ with Searchable {
     return results.toList
   }
 
-  def wordHistory(req: WordHistoryRequest): List[WordHistoryResult] = {
-    var scored = Array[ScoredDocument]()
-    
-    try {
-      val (root, actual) = WordHistory.runQuery(retrieval, req.query)
-      scored = actual
-  
+  def readDocumentDate(docName: String): Int = {
+    retrieval.getDocument(docName, cParms).metadata.getOrElse("date", "-1").replace("[^0-9]","").toInt
+  }
+
+  def wordHistory(req: WordHistoryRequest): WordHistoryResponse = {
+    // since the cost of looking up dates is so high, we collect all the documents and do it in one step
+    var alldocs = Set.newBuilder[String]
+
+    val found = for ( q <- req.queries ) yield {
+      val (root, scored) = WordHistory.runQuery(retrieval, q)
       Console.printf("Search completed with transformed query: `%s'\n", root)
-    } catch {
-      case ex: java.lang.reflect.InvocationTargetException => {
-        Console.println(ex)
-        ex.printStackTrace()
-      }
+
+      val res = scored.toList.flatMap(doc => {
+        if(doc.score != 0) {
+          val dname = doc.documentName
+          alldocs += dname
+          Some((dname, doc.score.toInt))
+        } else None
+      })
+      (q, res)
     }
 
+    val docNames = alldocs.result()
+
+    val start = System.currentTimeMillis
+    val docDates = docNames.map(dname => (dname, readDocumentDate(dname))).toMap
+    val end = System.currentTimeMillis
+    Console.printf("Date metadata lookup for %d documents took %d ms\n", docNames.size, end-start)
+
+    val flatres = for( (q, res) <- found ) yield {
+      val whresult = res.flatMap( nspair => {
+        val (name, score) = nspair
+        val date = docDates(name)
+        if( date != -1 ) {
+          Some(WordHistoryResult(name, date, score))
+        } else {
+          None
+        }
+      })
+
+      (q, whresult)
+    }
+
+    WordHistoryResponse(results = flatres.toMap)
+
+    
+    /*
     val start = System.currentTimeMillis
 
     val results = scored.toList.flatMap(doc => {
@@ -109,6 +141,7 @@ with Searchable {
     Console.printf("Date metadata lookup for %d results took %d ms\n", results.length, end-start)
 
     results
+    */
   }
 
   override def lookup(id: AccessIdentifier) : ProteusObject =

@@ -286,7 +286,7 @@ struct SearchResponse {
 }
 
 struct WordHistoryRequest {
-  1: string query,
+  1: list<string> queries,
 }
 
 struct WordHistoryResult {
@@ -296,7 +296,7 @@ struct WordHistoryResult {
 }
 
 struct WordHistoryResponse {
-  1: list<WordHistoryResult> results,
+  1: map<string, list<WordHistoryResult>> results,
 }
 
 enum TransformType {

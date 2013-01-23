@@ -16,7 +16,7 @@ class RemoteRandomDataProvider extends ProteusProvider.FutureIface with FakeData
     return Future(SearchResponse(results, None))
   }
 
-  override def wordHistory(req: WordHistoryRequest) = Future(WordHistoryResponse(List()))
+  override def wordHistory(req: WordHistoryRequest) = Future(WordHistoryResponse(Map()))
 
   override def lookup(lrequest: LookupRequest): Future[LookupResponse] = {
     var objects = List[ProteusObject]()
