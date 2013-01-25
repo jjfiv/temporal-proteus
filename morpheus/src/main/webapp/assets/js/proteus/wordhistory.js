@@ -8,7 +8,6 @@ var haveResultData = function() {
 
 // this is called when points are clicked on the main graph
 var displayPieChart = function(seriesName, year) {
-  console.log("displayPieChart("+seriesName+","+year+")");
   if(!haveResultData()) {
     return;
   }
@@ -63,7 +62,6 @@ $(document).ready(function() {
   if(!haveResultData())
     return;
   
-  console.log(resultData);
   var graphData = [];
   
   resultData.forEach(function(query) {
@@ -83,7 +81,6 @@ $(document).ready(function() {
     graphData.push(cur);
   });
 
-  //console.log(graphData);
 
   wordHistoryChart = new Highcharts.Chart({
     chart: {
