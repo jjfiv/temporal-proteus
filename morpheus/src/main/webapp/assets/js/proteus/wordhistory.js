@@ -23,8 +23,8 @@ var displayPieChart = function(seriesName, year) {
 
   var relevant_books = books[0].raw.filter(function(bk) { return bk.year === year; });
 
-  var hits = relevant_books.map(function(bk) { return bk.weight; });
-  var labels = relevant_books.map(function(bk) { return bk.name; });
+
+  var hits = relevant_books.map(function(bk) { return {name: bk.id, y: bk.weight}; });
 
   // clear old chart ?
   if(yearHistoryChart) { yearHistoryChart.destroy(); yearHistoryChart = undefined; }
@@ -34,11 +34,23 @@ var displayPieChart = function(seriesName, year) {
       renderTo: "yearFreqs",
       type: "pie"
     },
-    xAxis: { 
-      categories: labels
+    title: {
+      text: 'Term Frequency for "' + seriesName + '" in ' + year
+    },
+    plotOptions: {
+      series: {
+        cursor: 'pointer',
+        events: {
+          click: function(event) {
+            var bookId = event.point.name;
+            // go to the lookup? page for the selected book
+            window.location.href = "details?id="+encodeURIComponent(bookId)+"--sCollection--sportland";
+          }
+        }
+      }
     },
     series: [{
-      name: 'Term Frequency for "' + seriesName + '" in ' + year,
+      type: 'pie',
       data: hits
     }]
   });
