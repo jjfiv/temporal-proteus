@@ -212,30 +212,6 @@ import ProteusServlet._
     renderHTML("lookup", "result" -> splitResults)
   }
 
-  get("/searchhistory") {
-    val start = System.currentTimeMillis
-    var actuals = Seq[(String,Any)]()
-
-    if (params.contains("qs")) {
-      val qs = params("qs").split(",").toList.map(_.trim).filter(_.length != 0)
-
-      val future = dataClient.wordHistory(WordHistoryRequest(queries = qs))
-      
-      // time consuming step here...
-      val results = future().results
-
-      val resultJS = wordHistoryResultsToJS(results)
-
-      actuals +:= ("qs", qs)
-      actuals +:= ("results", resultJS)
-    }
-
-    val startRender = System.currentTimeMillis
-    val result = renderHTML("searchhistory", actuals:_*)
-    Console.println("render time: " + (System.currentTimeMillis-startRender)+"ms")
-    result
-  }
-
   get("/search") {
     var actuals = Seq[(String, Any)]() 
     
@@ -280,15 +256,26 @@ import ProteusServlet._
   }
 
   get("/wordhistory") {
-    var actuals = Seq[(String, Any)]()
-    if (params.contains("w")) {
-      val words = params("w").trim().split(" ").toList
-      val response = dataClient.wordFrequencies(words)()
-      actuals = ("frequencies" -> response.toMap) +: actuals
-      actuals = ("w" -> params("w")) +: actuals
+    val start = System.currentTimeMillis
+    var actuals = Seq[(String,Any)]()
+
+    if (params.contains("qs")) {
+      val qs = params("qs").split(",").toList.map(_.trim).filter(_.length != 0)
+
+      val future = dataClient.wordHistory(WordHistoryRequest(queries = qs))
+      
+      // time consuming step here...
+      val results = future().results
+
+      val resultJS = wordHistoryResultsToJS(results)
+
+      actuals +:= ("qs", qs)
+      actuals +:= ("results", resultJS)
     }
+
     renderHTML("wordhistory", actuals:_*)
   }
+
 
   def splitResults(results: Seq[SearchResult]) : Map[String, AnyRef] = {
     val splitBuilder = Map.newBuilder[String, AnyRef]
