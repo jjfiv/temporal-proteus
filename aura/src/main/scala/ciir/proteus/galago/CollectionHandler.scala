@@ -77,7 +77,15 @@ with Searchable {
   }
 
   def readDocumentDate(docName: String): Int = {
-    retrieval.getDocument(docName, cParms).metadata.getOrElse("date", "-1").replace("[^0-9]","").toInt
+    val dateString = retrieval.getDocument(docName, cParms).metadata.getOrElse("date", "")
+    try {
+      dateString.toInt
+    } catch {
+      case nfe: NumberFormatException => {
+        Console.printf("WARN: bad metadata for doc `%s', date=`%s'\n", docName, dateString);
+        -1
+      }
+    }
   }
 
   def wordHistory(req: WordHistoryRequest): WordHistoryResponse = {
