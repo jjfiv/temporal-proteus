@@ -87,7 +87,20 @@ object ToolsDeps {
   val galagoContrib = "org.lemurproject.galago" % "contrib" % "3.4"
   val galagoTupleflow = "org.lemurproject.galago" % "tupleflow" % "3.4"
 
-  def deps = Seq(galagoCore, galagoContrib, galagoTupleflow)
+  val modelHost = "edu.washington.cs.knowitall.stanford-corenlp";
+  val stNLPVersion = "1.3.4";
+
+  val stanfordNLP = "edu.stanford.nlp" % "stanford-corenlp" % stNLPVersion
+  
+  val stanfordNLPModels = Seq(
+      modelHost % "stanford-postag-models" % stNLPVersion,
+      modelHost % "stanford-parse-models" % stNLPVersion,
+      modelHost % "stanford-ner-models" % stNLPVersion,
+      modelHost % "stanford-dcoref-models" % stNLPVersion,
+      modelHost % "stanford-sutime-models" % stNLPVersion
+    );
+
+  def deps = Seq(galagoCore, galagoContrib, galagoTupleflow, stanfordNLP) ++ stanfordNLPModels
 }
 
 object MorpheusDeps {
