@@ -31,6 +31,12 @@ object ProteusBuild extends Build {
                Seq(resolvers := Resolvers.all,
                    libraryDependencies ++= MorpheusDeps.deps)
   ) dependsOn (aura)
+
+  lazy val temporal_tools = Project(
+    id = "temporal_tools",
+    base = file("temporal_tools"),
+    settings = buildSettings ++ Seq(resolvers := Resolvers.all, libraryDependencies ++= ToolsDeps.deps)
+  )
 }
 
 
@@ -74,6 +80,14 @@ object AuraDeps {
 
   def deps = Seq(thriftLib, finagleCore, finagleThrift, ostrich, scroogeRuntime,
 	       galagoCore, galagoContrib, galagoTupleflow, gson, logback)
+}
+
+object ToolsDeps {
+  val galagoCore = "org.lemurproject.galago" % "core" % "3.4"
+  val galagoContrib = "org.lemurproject.galago" % "contrib" % "3.4"
+  val galagoTupleflow = "org.lemurproject.galago" % "tupleflow" % "3.4"
+
+  def deps = Seq(galagoCore, galagoContrib, galagoTupleflow)
 }
 
 object MorpheusDeps {
