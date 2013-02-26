@@ -96,6 +96,48 @@ object SoundexAlgorithm {
   }
 }
 
+// use the date data to read in the set of terms in the corpus
+class CorpusWordSet(parameters: Parameters) {
+  import org.lemurproject.galago.core.index.disk.DiskBTreeReader
+
+  val dfile = new File(parameters.getString("dateDirectory"), "postings")
+  val index = new DiskBTreeReader(dfile)
+  printf("Opening word frequency index at %s\n", dfile.getCanonicalPath)
+
+  def process() {
+    var numTerms = 0
+    var uniqTerms = 0
+    var numTermsWithSpaces = 0
+    val iter = index.getIterator()
+    
+    var i=0
+    while(!iter.isDone()) {
+      val bytesOfKey = iter.getKey
+      val hasSpace = bytesOfKey.exists(_<32) 
+
+      if(i % 100000 == 0) {
+        println(new String(bytesOfKey))
+      }
+      val stream = iter.getSubValueStream(0, iter.getValueLength)
+      val count = stream.readInt()
+      iter.nextKey();
+      
+      i+=1 
+      uniqTerms+=1
+      numTerms+=count
+      if(hasSpace) {
+        numTermsWithSpaces+=1
+      }
+    }
+
+    println("Unique Terms: "+uniqTerms);
+    println("Total Terms: "+numTerms);
+    println("Num Terms with Spaces:" + numTermsWithSpaces)
+  }
+
+}
+
+
 object SoundexAnalyzer {
   def main(argv: Array[String]) {
     SoundexAlgorithm.test()
@@ -111,6 +153,9 @@ object SoundexAnalyzer {
         sys.exit()
       }
     }
+
+    val corpus = new CorpusWordSet(parameters)
+    corpus.process()
   }
 
 
