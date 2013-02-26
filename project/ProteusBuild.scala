@@ -32,10 +32,10 @@ object ProteusBuild extends Build {
                    libraryDependencies ++= MorpheusDeps.deps)
   ) dependsOn (aura)
 
-  lazy val temporal_tools = Project(
-    id = "temporal_tools",
-    base = file("temporal_tools"),
-    settings = buildSettings ++ Seq(resolvers := Resolvers.all, libraryDependencies ++= ToolsDeps.deps)
+  lazy val hestia = Project(
+    id = "hestia",
+    base = file("hestia"),
+    settings = buildSettings ++ Seq(resolvers := Resolvers.all, libraryDependencies ++= HestiaDeps.deps)
   )
 }
 
@@ -87,7 +87,7 @@ object AuraDeps {
 	       gson, logback) ++ CommonDeps.galagoDeps
 }
 
-object ToolsDeps {
+object HestiaDeps {
   val modelHost = "edu.washington.cs.knowitall.stanford-corenlp";
   val stNLPVersion = "1.3.4";
 

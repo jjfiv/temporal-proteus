@@ -4,6 +4,7 @@ Temporal - Some exploratory work on temporal data mining
 Phokas - Wrap book text in <strike>putrid sealskin</strike> TEI XML
 Morpheus - New front-end web service using the Scalatra lightweight router, and Scalate for templating.
 Aura - New proteus service using finagle/thrift
+Hestia - Offline analysis of book data
 
 Morpheus and Aura:
 These two subprojects compose a single SBT subproject.  All dependencies and settings for each are
