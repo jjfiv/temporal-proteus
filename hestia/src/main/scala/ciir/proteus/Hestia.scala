@@ -22,7 +22,7 @@ object Main {
         println("Using Galago backend")
       }
       case x => {
-        println("Unknown adapter given to hestia:ciir.proteus.Main `"+x+"'")
+        println("Unknown adapter given to ciir.proteus.Hestia `"+x+"'")
         sys.exit()
       }
     }
