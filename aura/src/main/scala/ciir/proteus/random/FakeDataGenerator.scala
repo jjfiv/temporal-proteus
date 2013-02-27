@@ -37,7 +37,6 @@ trait FakeDataGenerator {
 		  imgUrl = Some(genLink),
 		  thumbUrl = Some(genLink),
 		  externalUrl = Some(genLink),
-		  dateFreq = None,
 		  languageModel = None,
 		  collection = getCollection(aid.`type`),
 		  page = getPage(aid.`type`),

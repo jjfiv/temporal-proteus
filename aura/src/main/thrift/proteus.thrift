@@ -84,11 +84,6 @@ struct SearchRequest {
   4: optional string raw_galago_query
 }
 
-struct WeightedDate {
-  1: i64 date,
-  2: double weight = 1.0,
-}
-
 // Defines a region in text
 struct TextRegion {
   // Starting character index, inclusive.
@@ -124,13 +119,6 @@ struct Organization {
   1: optional string full_name,
   2: list<string> alternate_names,
   3: optional string wiki_link,
-}
-
-// Dates where this object was mentioned (e.g. a person)
-// or dates contained by this object (e.g. collection)
-// A list of long values (dates) : weight (frequency) pairs. Used for date mentions, and other things.
-struct LongValueList {
-  1: list<WeightedDate> dates,
 }
 
 // Representation of an abstract collection of ideas.
@@ -244,7 +232,6 @@ struct ProteusObject {
   4: optional string img_url,
   5: optional string thumb_url,
   6: optional string external_url,
-  7: optional LongValueList date_freq,
   8: optional TermList language_model,
   9: string language = "en",
 
@@ -289,14 +276,20 @@ struct WordHistoryRequest {
   1: list<string> queries,
 }
 
-struct WordHistoryResult {
-  1: string name,
+struct WordHistoryRecord {
+  1: string docName,
   2: i32 year,
   3: i32 weight;
 }
 
+struct TermHistory {
+  1: string term,
+  2: list<WordHistoryRecord> results
+}
+
 struct WordHistoryResponse {
-  1: map<string, list<WordHistoryResult>> results,
+  1: list<TermHistory> results = [],
+  2: list<TermHistory> similarQueries = []
 }
 
 enum TransformType {
@@ -373,7 +366,6 @@ service ProteusProvider {
   TransformResponse transform(1:TransformRequest trequest),
   SearchResponse related(1:RelatedRequest rrequest),
   StatusResponse status(),
-  map<string, LongValueList> wordFrequencies(1: list<string> words),
 }
 
 struct Target {

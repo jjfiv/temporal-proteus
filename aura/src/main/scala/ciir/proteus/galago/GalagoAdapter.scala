@@ -55,7 +55,6 @@ class GalagoAdapter(parameters: Parameters) extends ProteusProvider.FutureIface 
   val handlerMap: Map[ProteusType, Handler] = hBuilder.result
   val handlerKeys = handlerMap.keySet
   val links = LinkProvider(parameters)
-  val dates = WordDateProvider(parameters)
   //  End Construction
 
   override def search(srequest: SearchRequest): Future[SearchResponse] = {
@@ -203,11 +202,5 @@ class GalagoAdapter(parameters: Parameters) extends ProteusProvider.FutureIface 
 		 externalUrl = pObj.externalUrl,
 		 summary = Some(ResultSummary(text = pObj.description.getOrElse("No summary"), 
 					      highlights = List())))
-
-  override def wordFrequencies(words: Seq[String]) : Future[Map[String, LongValueList]] = {
-    val optionals = words.map(w => (w -> dates.lookup(w))).filter(_._2.isDefined)
-    var rBuilder = Map.newBuilder[String, LongValueList]
-    for (T <- optionals) { rBuilder += (T._1 -> T._2.get) }
-    Future(rBuilder.result)
-  }
 }
+

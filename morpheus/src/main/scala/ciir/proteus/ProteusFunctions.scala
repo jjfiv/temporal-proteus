@@ -86,34 +86,18 @@ object ProteusFunctions {
     return ("(?i)"+itemName).r.replaceAllIn(frontReplaced, (m: Match) => String.format("<b>%s</b>", m.group(0)))
   }
 
-  lazy val calendar = Calendar.getInstance
-  def prepareHighStockData(frequencies: Map[String, LongValueList]) : String = {
-    frequencies.toList.map {
-      entry => {
-        val (name, values) = entry
-        val valueStrings = values.dates.map {
-          weightedDate => {
-            calendar.set(weightedDate.date.toInt, 1, 1)
-            "[%d,%f]" format (calendar.getTimeInMillis, weightedDate.weight)
-          }
-        }.mkString(",")
-        "{name: '%s', data: [%s]}" format (name, valueStrings)
-        }
-    }.mkString(",")
-  }
-
-  private def wordHistoryQueryToJS(q: String, res: Seq[WordHistoryResult]): String = {
+  private def wordHistoryQueryToJS(q: String, res: Seq[WordHistoryRecord]): String = {
     //sort the data by year, increasing, and output it for Javascript
     
     val data = for (r <- res.sortBy(_.year)) yield {
-      "{id:\""+r.name+"\",year:"+r.year+",weight:"+r.weight+"}"
+      "{id:\""+r.docName+"\",year:"+r.year+",weight:"+r.weight+"}"
     }
 
     "{name:\""+q+"\",raw:["+data.mkString(",")+"]}"
   }
 
-  def wordHistoryResultsToJS(qr: scala.collection.Map[String, Seq[WordHistoryResult]]): String = {
-    val objs = for( (q, res) <- qr ) yield { wordHistoryQueryToJS(q, res) }
+  def wordHistoryResultsToJS(qr: Seq[TermHistory]): String = {
+    val objs = for( TermHistory(q, res) <- qr ) yield { wordHistoryQueryToJS(q, res) }
 
     "["+objs.mkString(",")+"]"
   }

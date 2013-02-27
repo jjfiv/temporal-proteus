@@ -114,42 +114,20 @@ with Searchable {
     Console.printf("Date metadata lookup for %d documents took %d ms\n", docNames.size, end-start)
 
     val flatres = for( (q, res) <- found ) yield {
-      val whresult = res.flatMap( nspair => {
+      val whrecords = res.flatMap( nspair => {
         val (name, score) = nspair
         val date = docDates(name)
         if( date != -1 ) {
-          Some(WordHistoryResult(name, date, score))
+          Some(WordHistoryRecord(name, date, score))
         } else {
           None
         }
       })
 
-      (q, whresult)
+      TermHistory(term=q, results=whrecords)
     }
 
-    WordHistoryResponse(results = flatres.toMap)
-
-    
-    /*
-    val start = System.currentTimeMillis
-
-    val results = scored.toList.flatMap(doc => {
-      if(doc.score == 0) {
-        None
-      } else {
-        val year = retrieval.getDocument(doc.documentName, cParms).metadata.getOrElse("date", "-1").replace("[^0-9]","").toInt
-        if (year > 0) {
-          Some(WordHistoryResult(name=doc.documentName, year = year, weight = doc.score.toInt))
-        } else { None }
-      }
-    })
-
-    val end = System.currentTimeMillis
-
-    Console.printf("Date metadata lookup for %d results took %d ms\n", results.length, end-start)
-
-    results
-    */
+    WordHistoryResponse(results = flatres, similarQueries = List())
   }
 
   override def lookup(id: AccessIdentifier) : ProteusObject =
