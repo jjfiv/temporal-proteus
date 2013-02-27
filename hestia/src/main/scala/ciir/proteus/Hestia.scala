@@ -110,8 +110,8 @@ class CorpusWordSet(parameters: Parameters) {
   import org.lemurproject.galago.core.index.disk.DiskBTreeReader
   import gnu.trove.map.hash.TObjectIntHashMap
 
-  //val path = parameters.getString("dateDirectory")
-  val path = parameters.getMap("handlers").getMap("collection").getString("index")
+  val path = parameters.getString("dateDirectory")
+  //val path = parameters.getMap("handlers").getMap("collection").getString("index")
 
   val dfile = new File(path, "postings")
   val index = new DiskBTreeReader(dfile)
@@ -121,6 +121,7 @@ class CorpusWordSet(parameters: Parameters) {
     var numTerms = 0
     var uniqTerms = 0
     var numTermsWithSpaces = 0
+    var singleTerms = 0
     val iter = index.getIterator()
 
     val smap = new TObjectIntHashMap[String]()
@@ -134,26 +135,34 @@ class CorpusWordSet(parameters: Parameters) {
 
       // soundexify everything that passes through
       val s = new String(bytesOfKey)
-      smap.adjustOrPutValue(SoundexAlgorithm(s), 1, 1)
-      soundexSamples += 1
+      if(!s.isEmpty) {
+        smap.adjustOrPutValue(SoundexAlgorithm(s), 1, 1)
+        soundexSamples += 1
+      }
 
       val stream = iter.getSubValueStream(0, iter.getValueLength)
       val count = stream.readInt()
+
       iter.nextKey();
       
       i+=1 
       uniqTerms+=1
       numTerms+=count
+      if(count <= 1) {
+        singleTerms += 1
+      }
       if(hasSpace) {
         numTermsWithSpaces+=1
       }
     }
 
-    println("Unique Terms: "+uniqTerms);
-    println("Total Terms: "+numTerms);
-    println("Num Terms with Spaces:" + numTermsWithSpaces)
-    println("Soundex Samples:" + soundexSamples)
-    println("Soundex Equivalence Classes:" + smap.size())
+    printf("Unique Terms: %d\n",uniqTerms);
+    printf("Total Terms: %d\n",numTerms);
+    printf("Num Terms with Spaces: %d\n", numTermsWithSpaces)
+    printf("Terms with tf=1: %d\n", singleTerms)
+    printf("Fraction Single Terms: %.3f\n", singleTerms.toDouble/uniqTerms.toDouble)
+    printf("Soundex Samples: %d\n", soundexSamples)
+    printf("Soundex Equivalence Classes: %d\n", smap.size())
   }
 
 }
