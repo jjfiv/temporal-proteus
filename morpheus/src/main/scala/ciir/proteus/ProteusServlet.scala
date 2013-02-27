@@ -44,7 +44,7 @@ import ProteusServlet._
   val kNumSearchResults = 10
 
   // Load the first server parameters 
-  val auraServer = ProteusServlet.hosts.first
+  val auraServer = ProteusServlet.hosts.head
   val dataService = ClientBuilder()
   .hosts(new InetSocketAddress(auraServer.host, auraServer.port))
   .codec(ThriftClientFramedCodec())
