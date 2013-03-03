@@ -36,7 +36,7 @@ object ProteusBuild extends Build {
     id = "hestia",
     base = file("hestia"),
     settings = buildSettings ++ Seq(resolvers := Resolvers.all, libraryDependencies ++= HestiaDeps.deps)
-  )
+  ) dependsOn (aura, morpheus)
 }
 
 
