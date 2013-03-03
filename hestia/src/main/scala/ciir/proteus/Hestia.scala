@@ -25,10 +25,15 @@ object Hestia {
   }
 }
 
+
+import gnu.trove.map.hash._
+import gnu.trove.set.hash._
 import ciir.proteus.galago.{Handler, Searchable, WordHistory}
 import ciir.proteus.galago.CollectionHandler
 import org.lemurproject.galago.core.retrieval.ScoredDocument
+import org.lemurproject.galago.core.retrieval.processing.ScoringContext
 import org.lemurproject.galago.core.retrieval.Retrieval
+import org.lemurproject.galago.core.retrieval.LocalRetrieval
 
 //  metadata cache - super important to making this run fast
 //  if metadata not in kernel 34 seconds to look up 1000 docs
@@ -36,7 +41,9 @@ import org.lemurproject.galago.core.retrieval.Retrieval
 //  if metadata in this hash, 1 ms to look up 1000 docs :)
 class DateCache(val handler: Handler with Searchable) {
   val retrieval = handler.retrieval
-  val docDates = new gnu.trove.map.hash.TIntIntHashMap()
+  val docDates = new TIntIntHashMap()
+  // map of date -> set[doc id]
+  //val datesToDoc = new TIntObjectHashMap[TIntHashSet]()
 
   def lookupDate(id: Int) = {
     var date = -1
@@ -53,6 +60,15 @@ class DateCache(val handler: Handler with Searchable) {
       date = docDates.get(id)
     }
     
+    // build reverse-map as well
+    /*
+    if(!datesToDoc.containsKey(date)) {
+      var docSet = new TIntHashSet
+      datesToDoc.put(date, docSet)
+    }
+    datesToDoc.get(date).add(id)
+    */
+
     date
   }
 
@@ -85,6 +101,63 @@ object CurveDataBuilder {
     results
   }
 
+  def inspectIndex(index: org.lemurproject.galago.core.index.Index) {
+    val partNames = index.getPartNames()
+    var lenIter = index.getLengthsIterator()
+
+    var dateToWordCount = new TIntIntHashMap()
+    var dateToBookCount = new TIntIntHashMap()
+    var idToLength = new TIntIntHashMap()
+    var maxLen = 0
+    var minLen = 1000000
+
+    val scoringContext = new ScoringContext
+    lenIter.setContext(scoringContext)
+
+    while(!lenIter.isDone) {
+      val id = lenIter.currentCandidate()
+      
+      scoringContext.document = id
+      lenIter.syncTo(id)
+
+      val len = lenIter.getCurrentLength
+      //println(id, len)
+
+      if(len > 0) { 
+        if(len > maxLen) {
+          maxLen = len
+        }
+        if(len < minLen) {
+          minLen = len
+        }
+
+        val date = dateCache.lookupDate(id)
+        dateToWordCount.adjustOrPutValue(date, len, len)
+        dateToBookCount.adjustOrPutValue(date, 1, 1)
+
+        idToLength.put(id, len)
+      }
+      lenIter.movePast(id)
+    }
+
+    var minDate = 4096 // I'll be long dead before this constant is bad
+    var maxDate = -1 
+    // iterate over dates now:
+    for(d <- dateToWordCount.keys) {
+      if(d != -1) {
+        if(d < minDate) { minDate = d }
+        if(d > maxDate) { maxDate = d }
+      }
+    }
+    
+    println("Index:")
+    println("  partNames: " + partNames)
+    println("  size: " + idToLength.size)
+    println("  maxLen: " + maxLen + " minLen: " + minLen)
+    println("  numDates: " + dateToWordCount.size)
+    printf("  years: [%d,%d]\n", minDate, maxDate)
+  }
+
   def main(args: Array[String]) {
     val parameters = Hestia.argsAsJSON(args)
 
@@ -97,8 +170,6 @@ object CurveDataBuilder {
     handlerParms.set("siteId", parameters.getString("siteId"))
     val handler = Handler(ProteusType.valueOf("collection").get, handlerParms).get.asInstanceOf[Handler with Searchable]
     val retrieval = handler.retrieval
-
-    println(retrieval.getGlobalParameters())
 
     // create date lookup tool
     dateCache = new DateCache(handler)
@@ -116,8 +187,8 @@ object CurveDataBuilder {
     doDateQuery(retrieval, "lincoln")
     doDateQuery(retrieval, "basie")
     doDateQuery(retrieval, "shakespeare")
-
-
+    
+    inspectIndex(retrieval.asInstanceOf[LocalRetrieval].getIndex())
 
   }
 }
