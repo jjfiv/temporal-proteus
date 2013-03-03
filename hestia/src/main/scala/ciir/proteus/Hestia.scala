@@ -63,12 +63,9 @@ class DateCache(val handler: Handler with Searchable) {
   }
 
   def size = docDates.size
-
 }
 
 object CurveDataBuilder {
-  import gnu.trove.map.hash._
-
   var dateCache: DateCache = null
 
   def lookupDates(sdocs: Array[ScoredDocument]) = {
@@ -100,6 +97,8 @@ object CurveDataBuilder {
     handlerParms.set("siteId", parameters.getString("siteId"))
     val handler = Handler(ProteusType.valueOf("collection").get, handlerParms).get.asInstanceOf[Handler with Searchable]
     val retrieval = handler.retrieval
+
+    println(retrieval.getGlobalParameters())
 
     // create date lookup tool
     dateCache = new DateCache(handler)

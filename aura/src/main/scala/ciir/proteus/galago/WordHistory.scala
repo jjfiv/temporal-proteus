@@ -32,8 +32,12 @@ object WordHistory {
 
   def runQuery(retrieval: Retrieval, request: String): Tuple2[Node, Array[ScoredDocument]] = {
     val galagoQuery = formatQuery(request)
+
+    // find out the number of documents the retrieval has
+    val numDocs = retrieval.getCollectionStatistics("#lengths:document:part=lengths()").documentCount.toInt
     
     val searchParams = new Parameters
+    searchParams.set("requested", numDocs)
 
     val root = StructuredQuery.parse(galagoQuery)
     val transformed: Node = retrieval.transformQuery(root, searchParams)
