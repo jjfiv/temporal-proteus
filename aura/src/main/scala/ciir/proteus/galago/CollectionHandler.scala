@@ -32,6 +32,7 @@ with Searchable {
   val archiveReaderUrl = "http://archive.org/stream"
   val retrieval = RetrievalFactory.instance(parameters)
   val retrievalType = ProteusType.Collection
+  val dateCache = new DateCache(this)
     
   val cParms = new Parameters;
   cParms.set("terms", false);
@@ -76,58 +77,24 @@ with Searchable {
     return results.toList
   }
 
-  def readDocumentDate(docName: String): Int = {
-    val dateString = retrieval.getDocument(docName, cParms).metadata.getOrElse("date", "")
-    try {
-      dateString.toInt
-    } catch {
-      case nfe: NumberFormatException => {
-        Console.printf("WARN: bad metadata for doc `%s', date=`%s'\n", docName, dateString);
-        -1
-      }
-    }
-  }
-
   def wordHistory(req: WordHistoryRequest): WordHistoryResponse = {
-    // since the cost of looking up dates is so high, we collect all the documents and do it in one step
-    var alldocs = Set.newBuilder[String]
-
     val found = for ( q <- req.queries ) yield {
       val (root, scored) = WordHistory.runQuery(retrieval, q)
       Console.printf("Search completed with transformed query: `%s'\n", root)
 
-      val res = scored.toList.flatMap(doc => {
-        if(doc.score != 0) {
-          val dname = doc.documentName
-          alldocs += dname
-          Some((dname, doc.score.toInt))
+      val res = scored.toList.flatMap(sdoc => {
+        val name = sdoc.documentName
+        val date = dateCache.dateForDoc(sdoc.document)
+        val score = sdoc.score.toInt
+
+        if(date != -1) {
+          Some(WordHistoryRecord(name, date, score))
         } else None
       })
-      (q, res)
+      TermHistory(q, res)
     }
 
-    val docNames = alldocs.result()
-
-    val start = System.currentTimeMillis
-    val docDates = docNames.map(dname => (dname, readDocumentDate(dname))).toMap
-    val end = System.currentTimeMillis
-    Console.printf("Date metadata lookup for %d documents took %d ms\n", docNames.size, end-start)
-
-    val flatres = for( (q, res) <- found ) yield {
-      val whrecords = res.flatMap( nspair => {
-        val (name, score) = nspair
-        val date = docDates(name)
-        if( date != -1 ) {
-          Some(WordHistoryRecord(name, date, score))
-        } else {
-          None
-        }
-      })
-
-      TermHistory(term=q, results=whrecords)
-    }
-
-    WordHistoryResponse(results = flatres, similarQueries = List())
+    WordHistoryResponse(results = found, similarQueries = List())
   }
 
   override def lookup(id: AccessIdentifier) : ProteusObject =
