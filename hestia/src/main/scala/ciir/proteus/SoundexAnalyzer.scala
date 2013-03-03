@@ -190,7 +190,7 @@ class CorpusWordSet(parameters: Parameters) {
 
 
 object SoundexAnalyzer {
-  def main(argv: Array[String]) {
+  def run(argv: Array[String]) {
     SoundexAlgorithm.test()
 
     val parameters = Hestia.argsAsJSON(argv)

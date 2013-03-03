@@ -19,10 +19,6 @@ object Hestia {
 
     parameters
   }
-
-  def main(args: Array[String]) {
-    println("This doesn't do anything.");
-  }
 }
 
 
@@ -40,12 +36,19 @@ import org.lemurproject.galago.core.retrieval.LocalRetrieval
 //  if metadata in kernel, 8 seconds to look up 1000 docs
 //  if metadata in this hash, 1 ms to look up 1000 docs :)
 class DateCache(val handler: Handler with Searchable) {
-  val retrieval = handler.retrieval
-  val docDates = new TIntIntHashMap()
-  // map of date -> set[doc id]
-  //val datesToDoc = new TIntObjectHashMap[TIntHashSet]()
+  var retrieval = handler.retrieval.asInstanceOf[LocalRetrieval]
+  var index = retrieval.getIndex
+  
+  // updated by init
+  private var docDates = new TIntIntHashMap()
+  private var dateToWordCount = new TIntIntHashMap()
+  private var dateToBookCount = new TIntIntHashMap()
+  var minDate = 4096
+  var maxDate = -1
 
-  def lookupDate(id: Int) = {
+  init()
+
+  private def initDocDate(id: Int) = {
     var date = -1
     if(!docDates.containsKey(id)) {
       try {
@@ -56,106 +59,100 @@ class DateCache(val handler: Handler with Searchable) {
         // Unknown Document Number exception...
         case e: java.io.IOException => { docDates.put(id, -1) }
       }
-    } else {
-      date = docDates.get(id)
     }
-    
-    // build reverse-map as well
-    /*
-    if(!datesToDoc.containsKey(date)) {
-      var docSet = new TIntHashSet
-      datesToDoc.put(date, docSet)
-    }
-    datesToDoc.get(date).add(id)
-    */
-
     date
   }
 
-  def fill() {
-    val collectionStats = retrieval.getCollectionStatistics("#lengths:document:part=lengths()")
-    val numDocs = collectionStats.documentCount.toInt
-    (0 to numDocs).map(lookupDate)
+  private def init() {
+    var lenIter = index.getLengthsIterator()
+
+    val context = new ScoringContext
+    lenIter.setContext(context)
+
+    while(!lenIter.isDone) {
+      val id = lenIter.currentCandidate
+      
+      context.document = id
+      lenIter.syncTo(id)
+
+      val len = lenIter.getCurrentLength
+
+      if(len > 0) { 
+        val date = initDocDate(id)
+
+        if(date != -1 && date < minDate) { minDate = date }
+        if(date > maxDate) { maxDate = date }
+
+        dateToWordCount.adjustOrPutValue(date, len, len)
+        dateToBookCount.adjustOrPutValue(date, 1, 1)
+      }
+      lenIter.movePast(id)
+    }
   }
 
+  def dateForDoc(id: Int) = docDates.get(id)
+
+  def wordCountForDate(date: Int) = dateToWordCount.get(date)
+  def bookCountForDate(date: Int) = dateToBookCount.get(date)
+
+  def inspectDateInfo() {
+    var minWords, maxWords, minBooks, maxBooks = 0
+
+    for(date <- dateToWordCount.keys()) {
+      val words = dateToWordCount.get(date)
+      val books = dateToBookCount.get(date)
+
+      if(books < minBooks) { minBooks = books }
+      if(books > maxBooks) { maxBooks = books }
+      if(words < minWords) { minWords = words }
+      if(words > maxWords) { maxWords = words }
+    }
+
+    println("Index:")
+    println("  numDates: " + dateToWordCount.size)
+    printf("  years: [%d,%d]\n", minDate, maxDate)
+    printf("  minBooks: %d, maxBooks: %d\n", minBooks, maxBooks)
+    printf("  minWords: %d, maxWords: %d\n", minWords, maxWords)
+  }
+
+  def domain = minDate to maxDate
+
   def size = docDates.size
+}
+
+object TextFile {
+  import java.io._
+
+  def write(fileName: String, action: PrintWriter=>Unit) {
+    val fp = new PrintWriter(fileName)
+    try { action(fp) } finally { fp.close() }
+  }
 }
 
 object CurveDataBuilder {
   var dateCache: DateCache = null
 
-  def lookupDates(sdocs: Array[ScoredDocument]) = {
-    val t0 = System.currentTimeMillis
-    val results = sdocs.map(sdoc => {
-      val name = sdoc.documentName
-      val id = sdoc.document
-      val score = sdoc.score.toInt
-      val date = dateCache.lookupDate(id)
+  def queryToWordCurve(retrieval: Retrieval, query: String) = {
+    var weights = new TIntDoubleHashMap
 
-      (name, id, score, date)
+    // run query
+    val (_, sdocs) = WordHistory.runQuery(retrieval, query)
+
+    // date all returned documents
+    sdocs.foreach(sdoc => {
+      val date = dateCache.dateForDoc(sdoc.document)
+      val score = sdoc.score
+      weights.adjustOrPutValue(date, score, score)
     })
-    val t1 = System.currentTimeMillis
 
-    println("Metadata lookup took: " + (t1-t0) + "ms!")
-
-    results
-  }
-
-  def inspectIndex(index: org.lemurproject.galago.core.index.Index) {
-    val partNames = index.getPartNames()
-    var lenIter = index.getLengthsIterator()
-
-    var dateToWordCount = new TIntIntHashMap()
-    var dateToBookCount = new TIntIntHashMap()
-    var idToLength = new TIntIntHashMap()
-    var maxLen = 0
-    var minLen = 1000000
-
-    val scoringContext = new ScoringContext
-    lenIter.setContext(scoringContext)
-
-    while(!lenIter.isDone) {
-      val id = lenIter.currentCandidate()
-      
-      scoringContext.document = id
-      lenIter.syncTo(id)
-
-      val len = lenIter.getCurrentLength
-      //println(id, len)
-
-      if(len > 0) { 
-        if(len > maxLen) {
-          maxLen = len
-        }
-        if(len < minLen) {
-          minLen = len
-        }
-
-        val date = dateCache.lookupDate(id)
-        dateToWordCount.adjustOrPutValue(date, len, len)
-        dateToBookCount.adjustOrPutValue(date, 1, 1)
-
-        idToLength.put(id, len)
-      }
-      lenIter.movePast(id)
-    }
-
-    var minDate = 4096 // I'll be long dead before this constant is bad
-    var maxDate = -1 
-    // iterate over dates now:
-    for(d <- dateToWordCount.keys) {
-      if(d != -1) {
-        if(d < minDate) { minDate = d }
-        if(d > maxDate) { maxDate = d }
+    // return normalized curve
+    for(date <- dateCache.domain) yield {
+      if(weights.containsKey(date)) {
+        weights.get(date) / dateCache.wordCountForDate(date)
+      } else {
+        0.0
       }
     }
-    
-    println("Index:")
-    println("  partNames: " + partNames)
-    println("  size: " + idToLength.size)
-    println("  maxLen: " + maxLen + " minLen: " + minLen)
-    println("  numDates: " + dateToWordCount.size)
-    printf("  years: [%d,%d]\n", minDate, maxDate)
   }
 
   def main(args: Array[String]) {
@@ -172,23 +169,29 @@ object CurveDataBuilder {
     val retrieval = handler.retrieval
 
     // create date lookup tool
-    dateCache = new DateCache(handler)
-
     val tStart = System.currentTimeMillis
-    dateCache.fill()
+    dateCache = new DateCache(handler)
     val tEnd = System.currentTimeMillis
     println("Cached " + dateCache.size + " dates in " + (tEnd-tStart) + "ms!")
 
-    def doDateQuery(retrieval: Retrieval, query: String) = {
-      val (_, results) = WordHistory.runQuery(retrieval, query)
-      lookupDates(results)
-    }
+    val queries = Seq("lincoln", "basie", "shakespeare", "hamlet")
+    val curves = queries.map(queryToWordCurve(retrieval, _))
 
-    doDateQuery(retrieval, "lincoln")
-    doDateQuery(retrieval, "basie")
-    doDateQuery(retrieval, "shakespeare")
-    
-    inspectIndex(retrieval.asInstanceOf[LocalRetrieval].getIndex())
+    TextFile.write("output.csv", out => {
+      out.print("date")
+      for(d <- dateCache.domain) {
+        out.print(", "+ d)
+      }
+      out.println()
+
+      for(i <- 0 until curves.size) {
+        out.print(queries(i))
+        for(cd <- curves(i)) {
+          out.print(", "+ cd)
+        }
+        out.println()
+      }
+    })
 
   }
 }

@@ -101,6 +101,8 @@ object HestiaDeps {
       modelHost % "stanford-sutime-models" % stNLPVersion
     );
 
+  //val charting = Seq("jfree" % "jfreechart" % "1.0.2")
+
   def deps = Seq(stanfordNLP) ++ stanfordNLPModels ++ CommonDeps.galagoDeps
 }
 
