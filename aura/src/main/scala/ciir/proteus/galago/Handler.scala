@@ -102,7 +102,7 @@ trait Searchable extends TypedStore {
 	   srequest.rawQuery, 
 	   (finish-start), 
 	   scored.length)
-    var limit = Math.min(offset + count, scored.length)
+    var limit = math.min(offset + count, scored.length)
     return Tuple2(transformed, scored.slice(offset, limit))
   }
   
