@@ -28,28 +28,58 @@ object Hestia {
 import ciir.proteus.galago.{Handler, Searchable, WordHistory}
 import ciir.proteus.galago.CollectionHandler
 import org.lemurproject.galago.core.retrieval.ScoredDocument
+import org.lemurproject.galago.core.retrieval.Retrieval
+
+//  metadata cache - super important to making this run fast
+//  if metadata not in kernel 34 seconds to look up 1000 docs
+//  if metadata in kernel, 8 seconds to look up 1000 docs
+//  if metadata in this hash, 1 ms to look up 1000 docs :)
+class DateCache(val handler: Handler with Searchable) {
+  val retrieval = handler.retrieval
+  val docDates = new gnu.trove.map.hash.TIntIntHashMap()
+
+  def lookupDate(id: Int) = {
+    var date = -1
+    if(!docDates.containsKey(id)) {
+      try {
+        val name = retrieval.getDocumentName(id)
+        date = handler.asInstanceOf[CollectionHandler].readDocumentDate(name)
+        docDates.put(id, date)
+      } catch {
+        // Unknown Document Number exception...
+        case e: java.io.IOException => { docDates.put(id, -1) }
+      }
+    } else {
+      date = docDates.get(id)
+    }
+    
+    date
+  }
+
+  def fill() {
+    val collectionStats = retrieval.getCollectionStatistics("#lengths:document:part=lengths()")
+    val numDocs = collectionStats.documentCount.toInt
+    (0 to numDocs).map(lookupDate)
+  }
+
+  def size = docDates.size
+
+}
 
 object CurveDataBuilder {
   import gnu.trove.map.hash._
 
-  //  metadata cache - super important to making this run fast
-  //  if metadata not in kernel 34 seconds to look up 1000 docs
-  //  if metadata in kernel, 8 seconds to look up 1000 docs
-  //  if metadata in this hash, 1 ms to look up 1000 docs :)
-  val docDates = new TIntIntHashMap()
+  var dateCache: DateCache = null
 
-  def lookupDates(handler: Handler, sdocs: Array[ScoredDocument]) = {
+  def lookupDates(sdocs: Array[ScoredDocument]) = {
     val t0 = System.currentTimeMillis
     val results = sdocs.map(sdoc => {
       val name = sdoc.documentName
       val id = sdoc.document
       val score = sdoc.score.toInt
+      val date = dateCache.lookupDate(id)
 
-      if(!docDates.containsKey(id)) {
-        docDates.put(id, handler.asInstanceOf[CollectionHandler].readDocumentDate(name))
-      }
-      
-      (name, id, score, docDates.get(id))
+      (name, id, score, date)
     })
     val t1 = System.currentTimeMillis
 
@@ -68,13 +98,25 @@ object CurveDataBuilder {
 
     val handlerParms = parameters.getMap("handlers").getMap("collection")
     handlerParms.set("siteId", parameters.getString("siteId"))
-    val handler = Handler(ProteusType.valueOf("collection").get, handlerParms).get
-    val retrieval = handler.asInstanceOf[Handler with Searchable].retrieval
+    val handler = Handler(ProteusType.valueOf("collection").get, handlerParms).get.asInstanceOf[Handler with Searchable]
+    val retrieval = handler.retrieval
 
-    val (_, results) = WordHistory.runQuery(retrieval, "lincoln")
-    lookupDates(handler, results)
-    lookupDates(handler, results)
-    lookupDates(handler, results)
+    // create date lookup tool
+    dateCache = new DateCache(handler)
+
+    val tStart = System.currentTimeMillis
+    dateCache.fill()
+    val tEnd = System.currentTimeMillis
+    println("Cached " + dateCache.size + " dates in " + (tEnd-tStart) + "ms!")
+
+    def doDateQuery(retrieval: Retrieval, query: String) = {
+      val (_, results) = WordHistory.runQuery(retrieval, query)
+      lookupDates(results)
+    }
+
+    doDateQuery(retrieval, "lincoln")
+    doDateQuery(retrieval, "basie")
+    doDateQuery(retrieval, "shakespeare")
 
 
 
