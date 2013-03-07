@@ -7,12 +7,16 @@ import org.lemurproject.galago.core.retrieval.ScoredDocument
 import org.lemurproject.galago.core.retrieval.processing.ScoringContext
 import org.lemurproject.galago.core.retrieval.Retrieval
 import org.lemurproject.galago.core.retrieval.LocalRetrieval
+import ciir.proteus.Util
 
 //  metadata cache - super important to making this run fast
 //  if metadata not in kernel 34 seconds to look up 1000 docs
 //  if metadata in kernel, 8 seconds to look up 1000 docs
 //  if metadata in this hash, 1 ms to look up 1000 docs :)
-class DateCache(val handler: Handler with Searchable) {
+class DateCache(val fileStore: String, val handler: Handler with Searchable) {
+  // for identifying files
+  val MagicNumber = 0xdadecace
+
   var retrieval = handler.retrieval.asInstanceOf[LocalRetrieval]
   var index = retrieval.getIndex
   
@@ -24,7 +28,11 @@ class DateCache(val handler: Handler with Searchable) {
   var maxDate = -1
 
   val t0 = System.currentTimeMillis
-  init()
+  if(Util.fileExists(fileStore)) {
+    loadFromFile(fileStore)
+  } else {
+    init()
+  }
   val tf = System.currentTimeMillis
 
   println("Init DateCache in "+(tf-t0)+"ms!")
@@ -94,6 +102,10 @@ class DateCache(val handler: Handler with Searchable) {
       }
       lenIter.movePast(id)
     }
+
+    if(fileStore.length != 0) {
+      saveToFile(fileStore)
+    }
   }
 
   def dateForDoc(id: Int) = docDates.get(id)
@@ -126,5 +138,62 @@ class DateCache(val handler: Handler with Searchable) {
   def domain = minDate to maxDate
 
   def size = docDates.size
+
+  def saveToFile(fileName: String) {
+    var fos = new java.io.FileOutputStream(fileName)
+    var dos = new java.io.DataOutputStream(fos)
+
+    try {
+      dos.writeInt(MagicNumber)
+      dos.writeInt(size)
+
+      for(id <- docDates.keys) {
+        val date = docDates.get(id)
+        dos.writeInt(id)
+        dos.writeInt(date)
+        dos.writeInt(dateToWordCount.get(date))
+        dos.writeInt(dateToBookCount.get(date))
+      }
+    } finally {
+      fos.close()
+    }
+  }
+
+  def loadFromFile(fileName: String) {
+    var fis = new java.io.FileInputStream(fileName)
+    var dis = new java.io.DataInputStream(fis)
+
+    var error = true
+
+    try {
+      val magicNum = dis.readInt
+      if(magicNum != MagicNumber) {
+        printf("Tried to interpret file \"%s\" as a DateCache object, bad Magic Number 0x%x != 0x%x!\n", fileName, magicNum, MagicNumber )
+      }
+
+      val count = dis.readInt
+
+      for(i <- 0 until count) {
+        val docId = dis.readInt
+        val date = dis.readInt
+        val wordCount = dis.readInt
+        val bookCount = dis.readInt
+
+        if(date != -1 && date < minDate) { minDate = date }
+        if(date > maxDate) { maxDate = date }
+
+        docDates.put(docId, date)
+        dateToWordCount.put(date, wordCount)
+        dateToBookCount.put(date, bookCount)
+      }
+
+      error = false
+    } finally {
+      fis.close()
+      
+      // if we failed to load, init from index & corpus metadata
+      if(error) { init() }
+    }
+  }
 }
 

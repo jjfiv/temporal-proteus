@@ -26,14 +26,22 @@ object Hestia {
   }
 }
 
-object TextFile {
+object NiceIO {
   import java.io._
 
   def write(fileName: String, action: PrintWriter=>Unit) {
-    val fp = new PrintWriter(fileName)
+    var fp = new PrintWriter(fileName)
     try { action(fp) } finally { fp.close() }
   }
+
+  def writeBinary(fileName: String, action: DataOutputStream=>Unit) {
+    var fp = new FileOutputStream(fileName)
+    var dataOutputStream = new DataOutputStream(fp)
+    try { action(dataOutputStream) } finally { fp.close() }
+  }
 }
+
+
 
 import org.lemurproject.galago.core.index.Index
 import org.lemurproject.galago.core.retrieval.ScoredDocument
@@ -58,7 +66,7 @@ class Vocabulary(retrieval: Retrieval, index: Index) {
 
       if(total % 10000 == 0) { println(total) }
 
-      if(!nonLetters && total % 50 == 0) {
+      if(!nonLetters && total % 250 == 0) {
         val (_, sdocs: Array[ScoredDocument]) = WordHistory.runQuery(retrieval, str)
         if(sdocs.length >= 2) {
           kept += 1
@@ -127,6 +135,7 @@ object CurveDataBuilder {
 
     // create date lookup tool
     dateCache = handler.asInstanceOf[CollectionHandler].dateCache
+    dateCache.saveToFile("/tmp/dateCache.bin")
 
     val queryTerm = "lincoln"
     val queryCurve = queryToWordCurve(retrieval, queryTerm)

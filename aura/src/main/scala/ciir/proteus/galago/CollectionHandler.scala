@@ -32,7 +32,7 @@ with Searchable {
   val archiveReaderUrl = "http://archive.org/stream"
   val retrieval = RetrievalFactory.instance(parameters)
   val retrievalType = ProteusType.Collection
-  val dateCache = new DateCache(this)
+  val dateCache = new DateCache(p.getString("dateCache"), this)
     
   val cParms = new Parameters;
   cParms.set("terms", false);
