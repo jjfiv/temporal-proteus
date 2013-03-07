@@ -50,7 +50,7 @@ object WordHistory {
       scored = Array[ScoredDocument]()
     }
 
-    printf("[wordhistory,q=%s,ms=%d,nr=%d]\n", request, finish-start, scored.length)
+    //printf("[wordhistory,q=%s,ms=%d,nr=%d]\n", request, finish-start, scored.length)
 
     Tuple2(transformed, scored)
   }

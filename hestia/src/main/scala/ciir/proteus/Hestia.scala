@@ -5,7 +5,8 @@ import org.lemurproject.galago.tupleflow.Parameters
 import ciir.proteus.galago.DateCache
 import gnu.trove.map.hash._
 import ciir.proteus.galago.{Handler, Searchable, WordHistory}
-import org.lemurproject.galago.core.retrieval.Retrieval
+import ciir.proteus.galago.CollectionHandler
+import org.lemurproject.galago.core.retrieval.{Retrieval, LocalRetrieval}
 
 object Hestia {
   def argsAsJSON(argv: Array[String]) = {
@@ -34,10 +35,52 @@ object TextFile {
   }
 }
 
+import org.lemurproject.galago.core.index.Index
+import org.lemurproject.galago.core.retrieval.ScoredDocument
+class Vocabulary(retrieval: Retrieval, index: Index) {
+  def init(index: Index) = {
+    val indexPartReader = index.getIndexPart("postings.porter")
+    if(indexPartReader == null) {
+      sys.exit(-1)
+    }
+
+    var keyIter = indexPartReader.getIterator
+    var keyBuilder = Vector.newBuilder[String]
+    var total = 0
+    var kept = 0
+
+    while(!keyIter.isDone) {
+      val str = keyIter.getKeyString
+
+      total += 1
+
+      val nonLetters = str.exists(!_.isLetter)
+
+      if(total % 10000 == 0) { println(total) }
+
+      if(!nonLetters && total % 50 == 0) {
+        val (_, sdocs: Array[ScoredDocument]) = WordHistory.runQuery(retrieval, str)
+        if(sdocs.length >= 2) {
+          kept += 1
+          keyBuilder += str
+        }
+      }
+
+      keyIter.nextKey
+    }
+
+    printf("Evaluated %d query terms, kept %d\n", total, kept)
+
+    keyBuilder.result
+  }
+
+  val data = init(index)
+}
+
 object CurveDataBuilder {
   var dateCache: DateCache = null
 
-  def queryToWordCurve(retrieval: Retrieval, query: String) = {
+  def queryToWordCurve(retrieval: Retrieval, query: String): IndexedSeq[Double] = {
     var weights = new TIntDoubleHashMap
 
     // run query
@@ -60,6 +103,11 @@ object CurveDataBuilder {
     }
   }
 
+  def diffCurve(a: IndexedSeq[Double], b: IndexedSeq[Double]) = {
+    def abs(x: Double) = if (x < 0) { -x } else { x }
+    a.zip(b).map( _ match { case Tuple2(x,y) => abs(x - y) } ).sum
+  }
+
   def main(args: Array[String]) {
     val parameters = Hestia.argsAsJSON(args)
 
@@ -68,36 +116,37 @@ object CurveDataBuilder {
       sys.exit(-1)
     }
 
-    val handlerParms = parameters.getMap("handlers").getMap("collection")
+    val handlerType = "collection"
+    val handlerParms = parameters.getMap("handlers").getMap(handlerType)
     handlerParms.set("siteId", parameters.getString("siteId"))
-    val handler = Handler(ProteusType.valueOf("collection").get, handlerParms).get.asInstanceOf[Handler with Searchable]
-    val retrieval = handler.retrieval
+    val handler = Handler(ProteusType.valueOf(handlerType).get, handlerParms).get.asInstanceOf[Handler with Searchable]
+    val retrieval = handler.retrieval.asInstanceOf[LocalRetrieval]
+    val index = retrieval.getIndex
+    
+    val vocab = new Vocabulary(retrieval, index)
 
     // create date lookup tool
-    val tStart = System.currentTimeMillis
-    dateCache = new DateCache(handler)
-    val tEnd = System.currentTimeMillis
-    println("Cached " + dateCache.size + " dates in " + (tEnd-tStart) + "ms!")
+    dateCache = handler.asInstanceOf[CollectionHandler].dateCache
 
-    val queries = Seq("lincoln", "basie", "shakespeare", "hamlet")
-    val curves = queries.map(queryToWordCurve(retrieval, _))
+    val queryTerm = "lincoln"
+    val queryCurve = queryToWordCurve(retrieval, queryTerm)
 
-    TextFile.write("output.csv", out => {
-      out.print("date")
-      for(d <- dateCache.domain) {
-        out.print(", "+ d)
-      }
-      out.println()
 
-      for(i <- 0 until curves.size) {
-        out.print(queries(i))
-        for(cd <- curves(i)) {
-          out.print(", "+ cd)
-        }
-        out.println()
-      }
-    })
+    var i=0
+    val scores = for( term <- vocab.data ) yield {
+      val q = new String(term)
+      val curve = queryToWordCurve(retrieval, q)
+      if(i % 10000 == 0) { println(i) }
+      i+=1
+      //diff curves..
+      diffCurve(queryCurve, curve)
+    }
 
+    val scored_terms = scores.zip(vocab.data).sortBy( _ match {
+      case Tuple2(x, y) => x
+    }).take(100)
+
+    scored_terms.map(println)
   }
 }
 

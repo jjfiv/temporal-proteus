@@ -127,3 +127,4 @@ class DateCache(val handler: Handler with Searchable) {
 
   def size = docDates.size
 }
+
