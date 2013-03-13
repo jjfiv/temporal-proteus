@@ -45,8 +45,24 @@ object NiceIO {
 
 import org.lemurproject.galago.core.index.Index
 import org.lemurproject.galago.core.retrieval.ScoredDocument
-class Vocabulary(retrieval: Retrieval, index: Index) {
-  def init(index: Index) = {
+class Vocabulary(val fileStore: String, var retrieval: Retrieval, var index: Index) {
+  
+  // for identifiying files
+  val MagicNumber = 0x70cabe14
+
+  // updated by init or load
+  var data = Vector[String]()
+  
+  val t0 = System.currentTimeMillis
+  if(Util.fileExists(fileStore)) {
+    loadFromFile(fileStore)
+  } else {
+    init()
+  }
+  val tf = System.currentTimeMillis
+  println("Init Vocabulary in "+(tf-t0)+"ms!")
+  
+  def init() = {
     val indexPartReader = index.getIndexPart("postings.porter")
     if(indexPartReader == null) {
       sys.exit(-1)
@@ -55,7 +71,6 @@ class Vocabulary(retrieval: Retrieval, index: Index) {
     var keyIter = indexPartReader.getIterator
     var keyBuilder = Vector.newBuilder[String]
     var total = 0
-    var kept = 0
 
     while(!keyIter.isDone) {
       val str = keyIter.getKeyString
@@ -66,23 +81,77 @@ class Vocabulary(retrieval: Retrieval, index: Index) {
 
       if(total % 10000 == 0) { println(total) }
 
-      if(!nonLetters && total % 250 == 0) {
-        val (_, sdocs: Array[ScoredDocument]) = WordHistory.runQuery(retrieval, str)
-        if(sdocs.length >= 2) {
-          kept += 1
-          keyBuilder += str
-        }
+      if(!nonLetters) {
+        keyBuilder += str
       }
 
       keyIter.nextKey
     }
 
+    val parSeq = keyBuilder.result.par.filter(key => {
+      val (_, sdocs) = WordHistory.runQuery(retrieval, key)
+      (sdocs.length) >= 2
+    })
+    data = parSeq.seq
+    val kept = data.size
+
+
+
     printf("Evaluated %d query terms, kept %d\n", total, kept)
 
-    keyBuilder.result
+    data = keyBuilder.result
+
+    if(fileStore.length != 0) {
+      saveToFile(fileStore)
+    }
   }
 
-  val data = init(index)
+  def loadFromFile(fileName: String) {
+    var fis = new java.io.FileInputStream(fileName)
+    var dis = new java.io.DataInputStream(fis)
+
+    var error = true
+
+    try {
+      val magicNum = dis.readInt
+      if(magicNum != MagicNumber) {
+        printf("Tried to interpret file \"%s\" as a Vocabulary object, bad Magic Number 0x%x != 0x%x!\n", fileName, magicNum, MagicNumber )
+      }
+
+      val count = dis.readInt
+      
+      var keyBuilder = Vector.newBuilder[String]
+
+      for(i <- 0 until count) {
+        keyBuilder += dis.readUTF
+      }
+
+      data = keyBuilder.result
+      error = false
+    } finally {
+      fis.close()
+      
+      // if we failed to load, init from index & corpus metadata
+      if(error) { init() }
+    }
+  }
+
+  def saveToFile(fileName: String) {
+    var fos = new java.io.FileOutputStream(fileName)
+    var dos = new java.io.DataOutputStream(fos)
+
+    try {
+      dos.writeInt(MagicNumber)
+      dos.writeInt(data.size)
+
+      data.foreach(s => {
+        dos.writeUTF(s)
+      })
+
+    } finally {
+      fos.close()
+    }
+  }
 }
 
 object CurveDataBuilder {
@@ -131,11 +200,10 @@ object CurveDataBuilder {
     val retrieval = handler.retrieval.asInstanceOf[LocalRetrieval]
     val index = retrieval.getIndex
     
-    val vocab = new Vocabulary(retrieval, index)
+    val vocab = new Vocabulary(handlerParms.getString("curveVocabCache"), retrieval, index)
 
     // create date lookup tool
     dateCache = handler.asInstanceOf[CollectionHandler].dateCache
-    dateCache.saveToFile("/tmp/dateCache.bin")
 
     val queryTerm = "lincoln"
     val queryCurve = queryToWordCurve(retrieval, queryTerm)
