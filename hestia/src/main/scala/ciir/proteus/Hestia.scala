@@ -71,6 +71,7 @@ class Vocabulary(val fileStore: String, var retrieval: Retrieval, var index: Ind
     var keyIter = indexPartReader.getIterator
     var keyBuilder = Vector.newBuilder[String]
     var total = 0
+    var kept = 0
 
     while(!keyIter.isDone) {
       val str = keyIter.getKeyString
@@ -82,20 +83,15 @@ class Vocabulary(val fileStore: String, var retrieval: Retrieval, var index: Ind
       if(total % 10000 == 0) { println(total) }
 
       if(!nonLetters) {
-        keyBuilder += str
+        val (_, sdocs: Array[ScoredDocument]) = WordHistory.runQuery(retrieval, str)
+        if(sdocs.length >= 2) {
+          kept += 1
+          keyBuilder += str
+        }
       }
 
       keyIter.nextKey
     }
-
-    val parSeq = keyBuilder.result.par.filter(key => {
-      val (_, sdocs) = WordHistory.runQuery(retrieval, key)
-      (sdocs.length) >= 2
-    })
-    data = parSeq.seq
-    val kept = data.size
-
-
 
     printf("Evaluated %d query terms, kept %d\n", total, kept)
 
@@ -180,9 +176,9 @@ object CurveDataBuilder {
     }
   }
 
-  def diffCurve(a: IndexedSeq[Double], b: IndexedSeq[Double]) = {
-    def abs(x: Double) = if (x < 0) { -x } else { x }
-    a.zip(b).map( _ match { case Tuple2(x,y) => abs(x - y) } ).sum
+  def diffCurve(a: IndexedSeq[Double], b: IndexedSeq[Double]): Double = {
+    def sqr(x: Double) = x*x
+    a.zip(b).map({ case Tuple2(x,y) => sqr(x - y) } ).sum
   }
 
   def main(args: Array[String]) {
@@ -209,21 +205,28 @@ object CurveDataBuilder {
     val queryCurve = queryToWordCurve(retrieval, queryTerm)
 
 
+    val start_query = System.currentTimeMillis
+    
     var i=0
     val scores = for( term <- vocab.data ) yield {
-      val q = new String(term)
-      val curve = queryToWordCurve(retrieval, q)
+      val curve = queryToWordCurve(retrieval, term)
       if(i % 10000 == 0) { println(i) }
       i+=1
       //diff curves..
-      diffCurve(queryCurve, curve)
+      (diffCurve(queryCurve, curve), term)
     }
+    
+    //val scores = vocab.data.map(term => (diffCurve(queryCurve, queryToWordCurve(retrieval, term)), term))
+    //val scores = vocab.data.par.map(term => (diffCurve(queryCurve, queryToWordCurve(retrieval, term)), term)).seq
 
-    val scored_terms = scores.zip(vocab.data).sortBy( _ match {
+    val scored_terms = scores.sortBy({
       case Tuple2(x, y) => x
     }).take(100)
 
     scored_terms.map(println)
+
+    val end_query = System.currentTimeMillis
+    println("Scoring took "+ (end_query-start_query) + "ms!")
   }
 }
 
