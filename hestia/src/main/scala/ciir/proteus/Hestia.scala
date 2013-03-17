@@ -1,11 +1,14 @@
 package ciir.proteus;
 
+import collection.mutable.ArrayBuffer
 import java.io.File
-import org.lemurproject.galago.tupleflow.Parameters
-import ciir.proteus.galago.DateCache
 import gnu.trove.map.hash._
+
+import ciir.proteus.galago.DateCache
 import ciir.proteus.galago.{Handler, Searchable, WordHistory}
 import ciir.proteus.galago.CollectionHandler
+
+import org.lemurproject.galago.tupleflow.Parameters
 import org.lemurproject.galago.core.retrieval.{Retrieval, LocalRetrieval}
 
 object Hestia {
@@ -41,17 +44,38 @@ object NiceIO {
   }
 }
 
-
-
 import org.lemurproject.galago.core.index.Index
+import org.lemurproject.galago.core.index.ValueIterator
+import org.lemurproject.galago.core.retrieval.iterator.MovableCountIterator
 import org.lemurproject.galago.core.retrieval.ScoredDocument
-class Vocabulary(val fileStore: String, var retrieval: Retrieval, var index: Index) {
+import org.lemurproject.galago.core.retrieval.processing.ScoringContext
+
+object GalagoIndexUtil {
+  def forKeyInIndex(index: Index, indexPartName: String, block: (String,MovableCountIterator)=>Unit) {
+    var indexPartReader = index.getIndexPart(indexPartName)
+    if(indexPartReader == null) { return }
+
+    var keyIter = indexPartReader.getIterator
+
+    while(!keyIter.isDone) {
+      val str = keyIter.getKeyString
+      var valueIter = keyIter.getValueIterator.asInstanceOf[MovableCountIterator]
+      valueIter.setContext(new ScoringContext)
+      block(str, valueIter)
+      keyIter.nextKey
+    }
+  }
+}
+
+
+class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval: Retrieval, var index: Index) {
   
   // for identifiying files
-  val MagicNumber = 0x70cabe14
+  val MagicNumber = 0xf0cabe14
 
   // updated by init or load
-  var data = Vector[String]()
+  var terms = Array[String]()
+  var freqData = Array[Array[Int]]()
   
   val t0 = System.currentTimeMillis
   if(Util.fileExists(fileStore)) {
@@ -63,22 +87,55 @@ class Vocabulary(val fileStore: String, var retrieval: Retrieval, var index: Ind
   println("Init Vocabulary in "+(tf-t0)+"ms!")
   
   def init() = {
-    val indexPartReader = index.getIndexPart("postings.porter")
-    if(indexPartReader == null) {
-      sys.exit(-1)
-    }
-
-    var keyIter = indexPartReader.getIterator
-    var keyBuilder = Vector.newBuilder[String]
+    
     var total = 0
-    var kept = 0
+    var keyBuilder = new ArrayBuffer[String]()
+    var curveBuilder = new ArrayBuffer[Array[Int]]()
 
-    while(!keyIter.isDone) {
-      val str = keyIter.getKeyString
-
+    GalagoIndexUtil.forKeyInIndex(index, "postings.porter", (key, valueIter) => {
       total += 1
 
+      if(total % 10000 == 0) { println(total) }
+
+      var docsForKey = new ArrayBuffer[Int]()
+      var countsForKey = new ArrayBuffer[Int]()
+      while(!valueIter.isDone) {
+        val doc = valueIter.currentCandidate
+        docsForKey += doc
+        countsForKey += valueIter.count()
+        valueIter.movePast(doc)
+      }
+
+      if(docsForKey.size >= 2) {
+        keyBuilder += key
+        docsForKey.map(dateCache.dateForDoc(_))
+      }
+      
+    })
+
+    println("Kept: " + keyBuilder.result.size + ", Total: " + total)
+
+    sys.exit(0)
+    /*
+    while(!keyIter.isDone) {
+      val str = keyIter.getKeyString
+      
+      total += 1
       val nonLetters = str.exists(!_.isLetter)
+      
+      var documents = Vector.newBuilder[Int]
+      var valueIterator = keyIter.getValueIterator
+      valueIterator.setContext(new ScoringContext)
+
+      while(!valueIterator.isDone) {
+        val document = valueIterator.currentCandidate
+        documents += document
+        valueIterator.movePast(document)
+      }
+
+      if(documents.
+
+
 
       if(total % 10000 == 0) { println(total) }
 
@@ -100,6 +157,7 @@ class Vocabulary(val fileStore: String, var retrieval: Retrieval, var index: Ind
     if(fileStore.length != 0) {
       saveToFile(fileStore)
     }
+    */
   }
 
   def loadFromFile(fileName: String) {
@@ -112,6 +170,7 @@ class Vocabulary(val fileStore: String, var retrieval: Retrieval, var index: Ind
       val magicNum = dis.readInt
       if(magicNum != MagicNumber) {
         printf("Tried to interpret file \"%s\" as a Vocabulary object, bad Magic Number 0x%x != 0x%x!\n", fileName, magicNum, MagicNumber )
+        throw new Error
       }
 
       val count = dis.readInt
@@ -125,7 +184,7 @@ class Vocabulary(val fileStore: String, var retrieval: Retrieval, var index: Ind
         }
       }
 
-      data = keyBuilder.result
+      terms = keyBuilder.result.toArray
       error = false
     } finally {
       fis.close()
@@ -141,9 +200,9 @@ class Vocabulary(val fileStore: String, var retrieval: Retrieval, var index: Ind
 
     try {
       dos.writeInt(MagicNumber)
-      dos.writeInt(data.size)
+      dos.writeInt(terms.size)
 
-      data.foreach(s => {
+      terms.foreach(s => {
         dos.writeUTF(s)
       })
 
@@ -155,6 +214,10 @@ class Vocabulary(val fileStore: String, var retrieval: Retrieval, var index: Ind
 
 object CurveDataBuilder {
   var dateCache: DateCache = null
+
+  def scoredDocsToWordCurve(sdocs: Array[ScoredDocument]) {
+    
+  }
 
   def queryToWordCurve(retrieval: Retrieval, query: String): Array[Double] = {
     val numDates = (dateCache.maxDate - dateCache.minDate) + 1
@@ -201,7 +264,7 @@ object CurveDataBuilder {
     }).sum >= 0
   }
 
-  def curveBasedQuery(term: String, retrieval: LocalRetrieval, data: Vector[Array[Double]]): Array[Double] = {
+  def curveBasedQuery(term: String, retrieval: LocalRetrieval, data: Array[Array[Double]]): Array[Double] = {
     val queryCurve = queryToWordCurve(retrieval, term)
     
     var i=0
@@ -231,14 +294,15 @@ object CurveDataBuilder {
     val retrieval = handler.retrieval.asInstanceOf[LocalRetrieval]
     val index = retrieval.getIndex
     
-    val vocab = new Vocabulary(handlerParms.getString("curveVocabCache"), retrieval, index)
-
-
     // create date lookup tool
     dateCache = handler.asInstanceOf[CollectionHandler].dateCache
 
-    val vocabCurves: Vector[Array[Double]] = Util.timed("Making Curves for Vocabulary", {
-      vocab.data.map(term => queryToWordCurve(retrieval, term))
+    // create dated vocabulary
+    val vocab = new Vocabulary(dateCache, handlerParms.getString("curveVocabCache"), retrieval, index)
+
+
+    val vocabCurves: Array[Array[Double]] = Util.timed("Making Curves for Vocabulary", {
+      vocab.terms.map(term => queryToWordCurve(retrieval, term))
     })
 
     var randomizer = new util.Random(13)
@@ -246,7 +310,7 @@ object CurveDataBuilder {
 
     // TODO, LSH
     //val start_partition = System.currentTimeMillis
-    //val (vocabA, vocabB) = vocab.data.partition(classifyCurve(randomPlane, _))
+    //val (vocabA, vocabB) = vocab.terms.partition(classifyCurve(randomPlane, _))
     //val end_partition = System.currentTimeMillis
     //println("Partitioning took " + (end_partition-start_partition) + "ms!")
 
@@ -258,7 +322,7 @@ object CurveDataBuilder {
     val numResults = 20
     // sort and trim to numResults
     val scored_terms = Util.timed("Sorting", {
-      scores.zip(vocab.data).sortBy(Util.firstOfPair).take(numResults)
+      scores.zip(vocab.terms).sortBy(Util.firstOfPair).take(numResults)
     })
 
     scored_terms.map(println)

@@ -169,6 +169,7 @@ class DateCache(val fileStore: String, val handler: Handler with Searchable) {
       val magicNum = dis.readInt
       if(magicNum != MagicNumber) {
         printf("Tried to interpret file \"%s\" as a DateCache object, bad Magic Number 0x%x != 0x%x!\n", fileName, magicNum, MagicNumber )
+        throw new Error
       }
 
       val count = dis.readInt
