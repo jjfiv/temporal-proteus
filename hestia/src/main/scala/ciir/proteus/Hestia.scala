@@ -119,7 +119,10 @@ class Vocabulary(val fileStore: String, var retrieval: Retrieval, var index: Ind
       var keyBuilder = Vector.newBuilder[String]
 
       for(i <- 0 until count) {
-        keyBuilder += dis.readUTF
+        val str = dis.readUTF
+        if(i % 120 == 0) {
+          keyBuilder += str
+        }
       }
 
       data = keyBuilder.result
@@ -181,6 +184,22 @@ object CurveDataBuilder {
     a.zip(b).map({ case Tuple2(x,y) => sqr(x - y) } ).sum
   }
 
+  def curveBasedQuery(term: String, retrieval: LocalRetrieval, data: Vector[String]): Array[Double] = {
+    val queryTerm = "lincoln"
+    val queryCurve = queryToWordCurve(retrieval, queryTerm)
+    
+    var i=0
+    val vlen = data.size
+    var scores = new Array[Double](vlen)
+    
+    while(i < vlen) {
+      scores(i) = diffCurve(queryCurve, queryToWordCurve(retrieval, data(i)))
+      i+=1
+    }
+
+    scores
+  }
+
   def main(args: Array[String]) {
     val parameters = Hestia.argsAsJSON(args)
 
@@ -201,32 +220,22 @@ object CurveDataBuilder {
     // create date lookup tool
     dateCache = handler.asInstanceOf[CollectionHandler].dateCache
 
-    val queryTerm = "lincoln"
-    val queryCurve = queryToWordCurve(retrieval, queryTerm)
 
 
     val start_query = System.currentTimeMillis
+    val scores = curveBasedQuery("lincoln", retrieval, vocab.data)
+    val end_query = System.currentTimeMillis
+    println("Scoring took "+ (end_query-start_query) + "ms!")
     
-    var i=0
-    val scores = for( term <- vocab.data ) yield {
-      val curve = queryToWordCurve(retrieval, term)
-      if(i % 10000 == 0) { println(i) }
-      i+=1
-      //diff curves..
-      (diffCurve(queryCurve, curve), term)
-    }
-    
-    //val scores = vocab.data.map(term => (diffCurve(queryCurve, queryToWordCurve(retrieval, term)), term))
-    //val scores = vocab.data.par.map(term => (diffCurve(queryCurve, queryToWordCurve(retrieval, term)), term)).seq
-
-    val scored_terms = scores.sortBy({
+    val start_sort = System.currentTimeMillis
+    val scored_terms = scores.zip(vocab.data).sortBy({
       case Tuple2(x, y) => x
-    }).take(100)
+    }).take(20)
+    val end_sort = System.currentTimeMillis
+    println("Sorting took "+ (end_sort-start_sort) + "ms!")
 
     scored_terms.map(println)
 
-    val end_query = System.currentTimeMillis
-    println("Scoring took "+ (end_query-start_query) + "ms!")
   }
 }
 
