@@ -120,7 +120,7 @@ class Vocabulary(val fileStore: String, var retrieval: Retrieval, var index: Ind
 
       for(i <- 0 until count) {
         val str = dis.readUTF
-        if(i % 120 == 0) {
+        if(i % 10 == 0) {
           keyBuilder += str
         }
       }
@@ -156,8 +156,9 @@ class Vocabulary(val fileStore: String, var retrieval: Retrieval, var index: Ind
 object CurveDataBuilder {
   var dateCache: DateCache = null
 
-  def queryToWordCurve(retrieval: Retrieval, query: String): IndexedSeq[Double] = {
-    var weights = new TIntDoubleHashMap
+  def queryToWordCurve(retrieval: Retrieval, query: String): Array[Double] = {
+    val numDates = (dateCache.maxDate - dateCache.minDate) + 1
+    var results = Array.fill(numDates) { 0.0 }
 
     // run query
     val (_, sdocs) = WordHistory.runQuery(retrieval, query)
@@ -165,35 +166,50 @@ object CurveDataBuilder {
     // date all returned documents
     sdocs.foreach(sdoc => {
       val date = dateCache.dateForDoc(sdoc.document)
-      val score = sdoc.score
-      weights.adjustOrPutValue(date, score, score)
+      if(date > 0) {
+        val score = sdoc.score
+        val index = date - dateCache.minDate
+        results(index) += score
+      }
     })
 
-    // return normalized curve
-    for(date <- dateCache.domain) yield {
-      if(weights.containsKey(date)) {
-        weights.get(date) / dateCache.wordCountForDate(date)
-      } else {
-        0.0
+    var i=0
+    while(i < numDates) {
+      if(results(i) != 0) {
+        val date = i+dateCache.minDate
+        val dateTF = dateCache.wordCountForDate(date)
+        if(dateTF != 0) {
+          results(i) /= dateTF
+        }
       }
+
+      i+= 1
     }
+    results
   }
 
-  def diffCurve(a: IndexedSeq[Double], b: IndexedSeq[Double]): Double = {
+  def diffCurve(a: Array[Double], b: Array[Double]): Double = {
     def sqr(x: Double) = x*x
     a.zip(b).map({ case Tuple2(x,y) => sqr(x - y) } ).sum
   }
 
-  def curveBasedQuery(term: String, retrieval: LocalRetrieval, data: Vector[String]): Array[Double] = {
-    val queryTerm = "lincoln"
-    val queryCurve = queryToWordCurve(retrieval, queryTerm)
+  def classifyCurve(planeNormal: Array[Double], dataPoint: Array[Double]): Boolean = {
+    def sign[A](x: Double): Int = { if(x < 0) -1 else 1 }
+    // take the difference of each point, and dot product it, so as to classify input points as being either to the left or the right of it, represented as a boolean
+    planeNormal.zip(dataPoint).map({
+      case Tuple2(norm, data) => sign(norm - data)
+    }).sum >= 0
+  }
+
+  def curveBasedQuery(term: String, retrieval: LocalRetrieval, data: Vector[Array[Double]]): Array[Double] = {
+    val queryCurve = queryToWordCurve(retrieval, term)
     
     var i=0
     val vlen = data.size
     var scores = new Array[Double](vlen)
     
     while(i < vlen) {
-      scores(i) = diffCurve(queryCurve, queryToWordCurve(retrieval, data(i)))
+      scores(i) = diffCurve(queryCurve, data(i))
       i+=1
     }
 
@@ -217,25 +233,35 @@ object CurveDataBuilder {
     
     val vocab = new Vocabulary(handlerParms.getString("curveVocabCache"), retrieval, index)
 
+
     // create date lookup tool
     dateCache = handler.asInstanceOf[CollectionHandler].dateCache
 
+    val vocabCurves: Vector[Array[Double]] = Util.timed("Making Curves for Vocabulary", {
+      vocab.data.map(term => queryToWordCurve(retrieval, term))
+    })
 
+    var randomizer = new util.Random(13)
+    val randomPlane = dateCache.domain.map(x => randomizer.nextDouble)
 
-    val start_query = System.currentTimeMillis
-    val scores = curveBasedQuery("lincoln", retrieval, vocab.data)
-    val end_query = System.currentTimeMillis
-    println("Scoring took "+ (end_query-start_query) + "ms!")
+    // TODO, LSH
+    //val start_partition = System.currentTimeMillis
+    //val (vocabA, vocabB) = vocab.data.partition(classifyCurve(randomPlane, _))
+    //val end_partition = System.currentTimeMillis
+    //println("Partitioning took " + (end_partition-start_partition) + "ms!")
+
+    // run query
+    val scores = Util.timed("Scoring", {
+      curveBasedQuery("lincoln", retrieval, vocabCurves)
+    })
     
-    val start_sort = System.currentTimeMillis
-    val scored_terms = scores.zip(vocab.data).sortBy({
-      case Tuple2(x, y) => x
-    }).take(20)
-    val end_sort = System.currentTimeMillis
-    println("Sorting took "+ (end_sort-start_sort) + "ms!")
+    val numResults = 20
+    // sort and trim to numResults
+    val scored_terms = Util.timed("Sorting", {
+      scores.zip(vocab.data).sortBy(Util.firstOfPair).take(numResults)
+    })
 
     scored_terms.map(println)
-
   }
 }
 
