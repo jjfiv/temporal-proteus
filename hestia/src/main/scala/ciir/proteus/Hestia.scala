@@ -106,54 +106,36 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
         valueIter.movePast(doc)
       }
 
-      if(docsForKey.size >= 2) {
+      var numDocs = docsForKey.size
+
+      if(numDocs >= 2) {
         keyBuilder += key
-        docsForKey.map(dateCache.dateForDoc(_))
+
+        val numDates = (dateCache.maxDate - dateCache.minDate) + 1
+        var results = Array.fill(numDates) { 0 }
+
+        results
+        var i = 0
+        while(i < numDocs) {
+          val date = dateCache.dateForDoc(docsForKey(i))
+          if(date != -1) {
+            val index = date - dateCache.minDate
+            results(index) += countsForKey(i)
+          }
+          
+          i+=1
+        }
+
+        curveBuilder += results
       }
-      
     })
 
     println("Kept: " + keyBuilder.result.size + ", Total: " + total)
 
-    sys.exit(0)
+    terms = keyBuilder.result.toArray
+    freqData = curveBuilder.result.toArray
+
     /*
-    while(!keyIter.isDone) {
-      val str = keyIter.getKeyString
-      
-      total += 1
-      val nonLetters = str.exists(!_.isLetter)
-      
-      var documents = Vector.newBuilder[Int]
-      var valueIterator = keyIter.getValueIterator
-      valueIterator.setContext(new ScoringContext)
-
-      while(!valueIterator.isDone) {
-        val document = valueIterator.currentCandidate
-        documents += document
-        valueIterator.movePast(document)
-      }
-
-      if(documents.
-
-
-
-      if(total % 10000 == 0) { println(total) }
-
-      if(!nonLetters) {
-        val (_, sdocs: Array[ScoredDocument]) = WordHistory.runQuery(retrieval, str)
-        if(sdocs.length >= 2) {
-          kept += 1
-          keyBuilder += str
-        }
-      }
-
-      keyIter.nextKey
-    }
-
-    printf("Evaluated %d query terms, kept %d\n", total, kept)
-
-    data = keyBuilder.result
-
     if(fileStore.length != 0) {
       saveToFile(fileStore)
     }
@@ -169,7 +151,7 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
     try {
       val magicNum = dis.readInt
       if(magicNum != MagicNumber) {
-        printf("Tried to interpret file \"%s\" as a Vocabulary object, bad Magic Number 0x%x != 0x%x!\n", fileName, magicNum, MagicNumber )
+        printf("Tried to interpret file \"%s\" as a Vocabulary object, bad MagicNumber 0x%x != 0x%x!\n", fileName, magicNum, MagicNumber )
         throw new Error
       }
 
@@ -186,6 +168,8 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
 
       terms = keyBuilder.result.toArray
       error = false
+    } catch {
+      case err: Error => { }
     } finally {
       fis.close()
       
@@ -215,13 +199,9 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
 object CurveDataBuilder {
   var dateCache: DateCache = null
 
-  def scoredDocsToWordCurve(sdocs: Array[ScoredDocument]) {
-    
-  }
-
-  def queryToWordCurve(retrieval: Retrieval, query: String): Array[Double] = {
+  def queryToWordCurve(retrieval: Retrieval, query: String): Array[Int] = {
     val numDates = (dateCache.maxDate - dateCache.minDate) + 1
-    var results = Array.fill(numDates) { 0.0 }
+    var results = new Array[Int](numDates)
 
     // run query
     val (_, sdocs) = WordHistory.runQuery(retrieval, query)
@@ -230,41 +210,50 @@ object CurveDataBuilder {
     sdocs.foreach(sdoc => {
       val date = dateCache.dateForDoc(sdoc.document)
       if(date > 0) {
-        val score = sdoc.score
+        val score = sdoc.score.toInt
         val index = date - dateCache.minDate
         results(index) += score
       }
     })
-
-    var i=0
-    while(i < numDates) {
-      if(results(i) != 0) {
-        val date = i+dateCache.minDate
-        val dateTF = dateCache.wordCountForDate(date)
-        if(dateTF != 0) {
-          results(i) /= dateTF
-        }
-      }
-
-      i+= 1
-    }
+    
     results
   }
 
-  def diffCurve(a: Array[Double], b: Array[Double]): Double = {
+  def diffCurve(a: Array[Int], b: Array[Int]): Double = {
     def sqr(x: Double) = x*x
-    a.zip(b).map({ case Tuple2(x,y) => sqr(x - y) } ).sum
+    def safe_div(x: Int, y: Int): Double = {
+      return x.toDouble / y.toDouble
+    }
+
+    var score = 0.0
+
+    var i=0
+    while(i < a.size) {
+      val date = dateCache.minDate + i
+      val count = dateCache.wordCountForDate(date)
+      
+      if(count != 0) {
+        val maxFreq = count.toDouble
+        val x = a(i).toDouble / maxFreq
+        val y = b(i).toDouble / maxFreq
+
+        score += sqr(x - y)
+      }
+      i+=1
+    }
+
+    score
   }
 
-  def classifyCurve(planeNormal: Array[Double], dataPoint: Array[Double]): Boolean = {
-    def sign[A](x: Double): Int = { if(x < 0) -1 else 1 }
+  def classifyCurve(planeNormal: Array[Int], dataPoint: Array[Int]): Boolean = {
+    def sign[A](x: Int): Int = { if(x < 0) -1 else 1 }
     // take the difference of each point, and dot product it, so as to classify input points as being either to the left or the right of it, represented as a boolean
     planeNormal.zip(dataPoint).map({
       case Tuple2(norm, data) => sign(norm - data)
     }).sum >= 0
   }
 
-  def curveBasedQuery(term: String, retrieval: LocalRetrieval, data: Array[Array[Double]]): Array[Double] = {
+  def curveBasedQuery(term: String, retrieval: LocalRetrieval, data: Array[Array[Int]]): Array[Double] = {
     val queryCurve = queryToWordCurve(retrieval, term)
     
     var i=0
@@ -294,29 +283,28 @@ object CurveDataBuilder {
     val retrieval = handler.retrieval.asInstanceOf[LocalRetrieval]
     val index = retrieval.getIndex
     
-    // create date lookup tool
+    // grab date lookup tool
     dateCache = handler.asInstanceOf[CollectionHandler].dateCache
 
     // create dated vocabulary
-    val vocab = new Vocabulary(dateCache, handlerParms.getString("curveVocabCache"), retrieval, index)
-
-
-    val vocabCurves: Array[Array[Double]] = Util.timed("Making Curves for Vocabulary", {
-      vocab.terms.map(term => queryToWordCurve(retrieval, term))
+    val vocab = Util.timed("Creating or Loading Vocabulary", {
+      new Vocabulary(dateCache, handlerParms.getString("curveVocabCache"), retrieval, index)
     })
 
-    var randomizer = new util.Random(13)
-    val randomPlane = dateCache.domain.map(x => randomizer.nextDouble)
-
     // TODO, LSH
-    //val start_partition = System.currentTimeMillis
-    //val (vocabA, vocabB) = vocab.terms.partition(classifyCurve(randomPlane, _))
-    //val end_partition = System.currentTimeMillis
-    //println("Partitioning took " + (end_partition-start_partition) + "ms!")
+    /*
+      var randomizer = new util.Random(13)
+      val randomPlane = dateCache.domain.map(x => randomizer.nextInt)
+      
+      val start_partition = System.currentTimeMillis
+      val (vocabA, vocabB) = vocab.terms.partition(classifyCurve(randomPlane, _))
+      val end_partition = System.currentTimeMillis
+      println("Partitioning took " + (end_partition-start_partition) + "ms!")
+    */
 
     // run query
     val scores = Util.timed("Scoring", {
-      curveBasedQuery("lincoln", retrieval, vocabCurves)
+      curveBasedQuery("lincoln", retrieval, vocab.freqData)
     })
     
     val numResults = 20
