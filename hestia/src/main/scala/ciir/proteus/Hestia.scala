@@ -38,7 +38,7 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
     GalagoIndexUtil.forKeyInIndex(index, "postings.porter", (key, valueIter) => {
       total += 1
 
-      if(total % 10000 == 0) { println(total) }
+      if(total % 10000 == 0) { println("read postings "+total) }
 
       var docsForKey = new ArrayBuffer[Int]()
       var countsForKey = new ArrayBuffer[Int]()
@@ -56,8 +56,6 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
 
         var results = new TIntIntHashMap
 
-        val numDates = (dateCache.maxDate - dateCache.minDate) + 1
-
         var i = 0
         while(i < numDocs) {
           val date = dateCache.dateForDoc(docsForKey(i))
@@ -68,7 +66,7 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
           i+=1
         }
 
-        curveBuilder += new TimeCurve(results)
+        curveBuilder += TimeCurve.ofTroveMap(dateCache, results)
       }
     })
 
@@ -95,25 +93,16 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
       }
 
       val count = dis.readInt
-      val minDate = dis.readInt
-      val maxDate = dis.readInt
-
-      if(minDate != dateCache.minDate || maxDate != dateCache.maxDate) {
-        println("Dates messed up!")
-        sys.exit(-1)
-        throw new Error
-      }
-      val numDates = (maxDate - minDate)+1
       
       var keyBuilder = new ArrayBuffer[String]()
       var curveBuilder = new ArrayBuffer[TimeCurve]()
 
       var i=0
       while(i < count) {
-        if(i % 10000 == 0) { println(i); }
+        if(i % 10000 == 0) { println("load vocab "+i); }
 
         keyBuilder += dis.readUTF
-        curveBuilder += TimeCurve.unencode(dis, numDates)
+        curveBuilder += TimeCurve.unencode(dis, dateCache)
 
         i+=1
       }
@@ -139,12 +128,9 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
       dos.writeInt(MagicNumber)
       dos.writeInt(terms.size)
 
-      dos.writeInt(dateCache.minDate)
-      dos.writeInt(dateCache.maxDate)
-
       var i=0
       while(i < terms.size) {
-        if(i % 10000 == 0) { println(i) }
+        if(i % 10000 == 0) { println("writeVocab "+i) }
 
         dos.writeUTF(terms(i))
         TimeCurve.encode(dos, freqData(i))
@@ -176,7 +162,7 @@ object CurveDataBuilder {
       }
     })
     
-    new TimeCurve(results)
+    TimeCurve.ofTroveMap(dateCache, results)
   }
 
   def curveBasedQuery(term: String, retrieval: LocalRetrieval, data: Array[TimeCurve]): Array[Double] = {
@@ -187,7 +173,8 @@ object CurveDataBuilder {
     var scores = new Array[Double](vlen)
     
     while(i < vlen) {
-      scores(i) = queryCurve.score(data(i), dateCache)
+      if(i % 10000 == 0) { println("query "+i) }
+      scores(i) = queryCurve.score(data(i))
       i+=1
     }
 
@@ -232,6 +219,9 @@ object CurveDataBuilder {
     val scores = Util.timed("Scoring", {
       curveBasedQuery("lincoln", retrieval, vocab.freqData)
     })
+
+    println("Union Time: " + TimeCurve.unionTime)
+    println("Compare Time: " + TimeCurve.compareTime)
     
     val numResults = 20
     // sort and trim to numResults

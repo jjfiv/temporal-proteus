@@ -125,6 +125,7 @@ class DateCache(val fileStore: String, val handler: Handler with Searchable) {
   }
 
   def domain = minDate to maxDate
+  def numDates = (maxDate - minDate) + 1
 
   def size = docDates.size
 

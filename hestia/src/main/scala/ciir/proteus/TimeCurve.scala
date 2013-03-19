@@ -3,32 +3,37 @@ package ciir.proteus
 import ciir.proteus.galago.DateCache
 import org.lemurproject.galago.tupleflow.Utility
 import gnu.trove.map.hash._
+import gnu.trove.procedure._
+import collection.mutable.ArrayBuffer
 
 object TimeCurve {
+  var unionTime = 0.0
+  var compareTime = 0.0
+
   def encode(dos: java.io.DataOutputStream, tc: TimeCurve) {
-    //tc.data.foreach(Utility.compressInt(dos, _))
-    //tc.data.foreach(dos.writeShort(_))
+    val arr = tc.data
+    var map = new TIntIntHashMap
 
-    val map = tc.data
+    val minDate = tc.dateCache.minDate
+    var i=0;
+    while(i < arr.size) {
+      val count = arr(i)
+      if(count > 0) {
+        val date = minDate + i
+        map.put(date, count)
+      }
+      i+=1
+    }
+    
     dos.writeInt(map.size)
-
     for(date <- map.keys) {
       val count = map.get(date)
-
       dos.writeShort(date)
       dos.writeShort(count)
     }
   }
 
-  def unencode(dis: java.io.DataInputStream, numDates: Int): TimeCurve = {
-    //var pts = new Array[Int](numDates)
-    //var j=0
-    //while(j < numDates) {
-    //  //pts(j) = dis.readShort
-    //  pts(j) = Utility.uncompressInt(dis)
-    //  j+=1
-    //}
-    //new TimeCurve(pts)
+  def unencode(dis: java.io.DataInputStream, dateCache: DateCache): TimeCurve = {
     var pts = new TIntIntHashMap
     val size = dis.readInt
 
@@ -37,13 +42,41 @@ object TimeCurve {
       val count = dis.readShort
       pts.put(date, count)
     }
-    new TimeCurve(pts)
+    TimeCurve.ofTroveMap(dateCache, pts)
   }
 
-  /*
-  def compare(dateCache: DateCache, a: TimeCurve, b: TimeCurve): Double = {
+  def ofTroveMap(dateCache: DateCache, data: TIntIntHashMap) = {
+    val numDates = dateCache.numDates
+    val minDate = dateCache.minDate
+    var arr = new Array[Int](numDates)
+    
+    data.keys.foreach(date => {
+      val count = data.get(date)
+      if(count > 0 && date > 0) {
+        val index = date - minDate
+        if(!(index >= 0 && index <= 140)) {
+          println(index)
+          println(date)
+          println(minDate)
+          println(numDates)
+          assert(false)
+        }
+        arr(index) = count
+      }
+    })
+
+    new TimeCurve(dateCache, arr)
+  }
+}
+
+// sparse representation of time curve more efficient?
+class TimeCurve(val dateCache: DateCache, val data: Array[Int]) {
+  
+  def score(against: TimeCurve): Double = {
     def sqr(x: Double) = x*x
 
+    val a = data
+    val b = against.data
     var score = 0.0
 
     var i=0
@@ -53,8 +86,8 @@ object TimeCurve {
       
       if(count != 0) {
         val maxFreq = count.toDouble
-        val x = a.data(i).toDouble / maxFreq
-        val y = b.data(i).toDouble / maxFreq
+        val x = a(i).toDouble / maxFreq
+        val y = b(i).toDouble / maxFreq
 
         score += sqr(x - y)
       }
@@ -63,32 +96,9 @@ object TimeCurve {
 
     score
   }
-  */
-}
-
-// sparse representation of time curve more efficient?
-class TimeCurve(val data: TIntIntHashMap) {
-  def score(against: TimeCurve, dateCache: DateCache): Double = {
-    val allDates = data.keys().toSet.union(against.data.keys().toSet)
-
-    var result = 0.0
-
-    for(date <- allDates) {
-      val count = dateCache.wordCountForDate(date)
-      
-      if(count != 0) {
-        val maxFreq = count.toDouble
-
-        val a = data.get(date).toDouble / maxFreq
-        val b = against.data.get(date).toDouble / maxFreq
-
-        result += (a-b)*(a-b)
-      }
-    }
-    result
-  }
 
 }
+
 /*
 class TimeCurve(val data: Array[Int]) {
   def size = data.size
