@@ -4,10 +4,16 @@ import ciir.proteus.galago.DateCache
 import org.lemurproject.galago.tupleflow.Utility
 
 object TimeCurve {
+  def encode(dos: java.io.DataOutputStream, tc: TimeCurve) {
+    tc.data.foreach(Utility.compressInt(dos, _))
+    //tc.data.foreach(dos.writeShort(_))
+  }
+
   def unencode(dis: java.io.DataInputStream, numDates: Int): TimeCurve = {
     var pts = new Array[Int](numDates)
     var j=0
     while(j < numDates) {
+      //pts(j) = dis.readShort
       pts(j) = Utility.uncompressInt(dis)
       j+=1
     }
@@ -42,10 +48,6 @@ object TimeCurve {
 }
 
 class TimeCurve(val data: Array[Int]) {
-  def encode(dos: java.io.DataOutputStream) {
-    data.foreach(Utility.compressInt(dos, _))
-  }
-
   def size = data.size
 
   def classifyAgainst(planeNormal: TimeCurve): Boolean = {
@@ -56,4 +58,5 @@ class TimeCurve(val data: Array[Int]) {
     }).sum >= 0
   }
 }
+
 

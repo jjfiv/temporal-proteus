@@ -11,6 +11,7 @@ import ciir.proteus.galago.CollectionHandler
 import org.lemurproject.galago.core.index.Index
 import org.lemurproject.galago.tupleflow.Parameters
 import org.lemurproject.galago.core.retrieval.{Retrieval, LocalRetrieval}
+import org.lemurproject.galago.tupleflow.StreamCreator
 
 class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval: Retrieval, var index: Index) {
   // for identifiying files
@@ -83,8 +84,7 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
   }
 
   def loadFromFile(fileName: String) {
-    var fis = new java.io.FileInputStream(fileName)
-    var dis = new java.io.DataInputStream(fis)
+    var dis = StreamCreator.openInputStream(fileName)
 
     var error = true
 
@@ -111,12 +111,11 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
 
       var i=0
       while(i < count) {
-        val str = dis.readUTF
-        keyBuilder += str
+        if(i % 10000 == 0) { println(i); }
 
-        if(i % 10000 == 0) { printf("load: %1.2f%%\n",100.0*(i.toDouble/count.toDouble)); }
-
+        keyBuilder += dis.readUTF
         curveBuilder += TimeCurve.unencode(dis, numDates)
+
         i+=1
       }
 
@@ -127,7 +126,7 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
     } catch {
       case err: Error => { }
     } finally {
-      fis.close()
+      dis.close()
       
       // if we failed to load, init from index & corpus metadata
       if(error) { init() }
@@ -135,8 +134,7 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
   }
 
   def saveToFile(fileName: String) {
-    var fos = new java.io.FileOutputStream(fileName)
-    var dos = new java.io.DataOutputStream(fos)
+    var dos = StreamCreator.openOutputStream(fileName)
 
     try {
       dos.writeInt(MagicNumber)
@@ -147,15 +145,16 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
 
       var i=0
       while(i < terms.size) {
-        if(i % 10000 == 0) { println(i); println(freqData(i).size); println(terms(i)) }
+        if(i % 10000 == 0) { println(i) }
+
         dos.writeUTF(terms(i))
-        freqData(i).encode(dos)
+        TimeCurve.encode(dos, freqData(i))
 
         i+=1
       }
 
     } finally {
-      fos.close()
+      dos.close()
     }
   }
 }

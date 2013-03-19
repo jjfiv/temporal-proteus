@@ -7,6 +7,7 @@ import org.lemurproject.galago.core.retrieval.ScoredDocument
 import org.lemurproject.galago.core.retrieval.processing.ScoringContext
 import org.lemurproject.galago.core.retrieval.Retrieval
 import org.lemurproject.galago.core.retrieval.LocalRetrieval
+import org.lemurproject.galago.tupleflow.StreamCreator
 import ciir.proteus._
 
 //  metadata cache - super important to making this run fast
@@ -128,8 +129,7 @@ class DateCache(val fileStore: String, val handler: Handler with Searchable) {
   def size = docDates.size
 
   def saveToFile(fileName: String) {
-    var fos = new java.io.FileOutputStream(fileName)
-    var dos = new java.io.DataOutputStream(fos)
+    var dos = StreamCreator.openOutputStream(fileName)
 
     try {
       dos.writeInt(MagicNumber)
@@ -143,13 +143,12 @@ class DateCache(val fileStore: String, val handler: Handler with Searchable) {
         dos.writeInt(dateToBookCount.get(date))
       }
     } finally {
-      fos.close()
+      dos.close()
     }
   }
 
   def loadFromFile(fileName: String) {
-    var fis = new java.io.FileInputStream(fileName)
-    var dis = new java.io.DataInputStream(fis)
+    var dis = StreamCreator.openInputStream(fileName)
 
     var error = true
 
@@ -178,7 +177,7 @@ class DateCache(val fileStore: String, val handler: Handler with Searchable) {
 
       error = false
     } finally {
-      fis.close()
+      dis.close()
       
       // if we failed to load, init from index & corpus metadata
       if(error) { init() }
