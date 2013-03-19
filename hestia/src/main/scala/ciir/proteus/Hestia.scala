@@ -8,50 +8,9 @@ import ciir.proteus.galago.DateCache
 import ciir.proteus.galago.{Handler, Searchable, WordHistory}
 import ciir.proteus.galago.CollectionHandler
 
+import org.lemurproject.galago.core.index.Index
 import org.lemurproject.galago.tupleflow.Parameters
 import org.lemurproject.galago.core.retrieval.{Retrieval, LocalRetrieval}
-
-object Hestia {
-  def argsAsJSON(argv: Array[String]) = {
-    val (files, args) = argv.partition { arg => new File(arg).exists() }
-
-    val parameters = new Parameters()
-    
-    // load all json files given
-    files.map(f => {
-      parameters.copyFrom(Parameters.parse(new File(f)))
-    })
-
-    // read parameters from arguments next
-    parameters.copyFrom(new Parameters(args));
-
-    parameters
-  }
-}
-
-import org.lemurproject.galago.core.index.Index
-import org.lemurproject.galago.core.index.ValueIterator
-import org.lemurproject.galago.core.retrieval.iterator.MovableCountIterator
-import org.lemurproject.galago.core.retrieval.ScoredDocument
-import org.lemurproject.galago.core.retrieval.processing.ScoringContext
-
-object GalagoIndexUtil {
-  def forKeyInIndex(index: Index, indexPartName: String, block: (String,MovableCountIterator)=>Unit) {
-    var indexPartReader = index.getIndexPart(indexPartName)
-    if(indexPartReader == null) { return }
-
-    var keyIter = indexPartReader.getIterator
-
-    while(!keyIter.isDone) {
-      val str = keyIter.getKeyString
-      var valueIter = keyIter.getValueIterator.asInstanceOf[MovableCountIterator]
-      valueIter.setContext(new ScoringContext)
-      block(str, valueIter)
-      keyIter.nextKey
-    }
-  }
-}
-
 
 class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval: Retrieval, var index: Index) {
   // for identifiying files
@@ -240,7 +199,7 @@ object CurveDataBuilder {
   }
 
   def main(args: Array[String]) {
-    val parameters = Hestia.argsAsJSON(args)
+    val parameters = Util.argsAsJSON(args)
 
     if(parameters.getString("siteId").isEmpty) {
       println("Bad configuration file?")
@@ -287,4 +246,5 @@ object CurveDataBuilder {
     scored_terms.map(println)
   }
 }
+
 

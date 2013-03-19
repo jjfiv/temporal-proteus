@@ -16,20 +16,7 @@ import org.lemurproject.galago.tupleflow.Utility
 
 object AdapterServer {
   def main(args: Array[String]) {
-    val (fileArgs: Array[String], nonFileArgs: Array[String]) = args.partition { 
-      arg : String => 
-	new File(arg).exists()
-    }
-    val parameters = new Parameters()
-    // Read in all files
-    for (path <- fileArgs; f = new File(path)) {
-      val tmp = Parameters.parse(f)
-      parameters.copyFrom(tmp)
-    }
-
-    // Command-line overrides file args
-    val tmp = new Parameters(nonFileArgs)
-    parameters.copyFrom(tmp)
+    val parameters = Util.argsAsJSON(args)
 
     if (!parameters.containsKey("adapter")) {
       println("Please provide an 'adapter' type in the parameters.");

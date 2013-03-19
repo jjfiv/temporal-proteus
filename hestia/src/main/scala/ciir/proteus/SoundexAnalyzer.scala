@@ -193,7 +193,7 @@ object SoundexAnalyzer {
   def run(argv: Array[String]) {
     SoundexAlgorithm.test()
 
-    val parameters = Hestia.argsAsJSON(argv)
+    val parameters = Util.argsAsJSON(argv)
 
     parameters.getString("adapter") match {
       case "galago" => {

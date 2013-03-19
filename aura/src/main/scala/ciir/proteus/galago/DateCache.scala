@@ -7,7 +7,7 @@ import org.lemurproject.galago.core.retrieval.ScoredDocument
 import org.lemurproject.galago.core.retrieval.processing.ScoringContext
 import org.lemurproject.galago.core.retrieval.Retrieval
 import org.lemurproject.galago.core.retrieval.LocalRetrieval
-import ciir.proteus.Util
+import ciir.proteus._
 
 //  metadata cache - super important to making this run fast
 //  if metadata not in kernel 34 seconds to look up 1000 docs
@@ -44,11 +44,12 @@ class DateCache(val fileStore: String, val handler: Handler with Searchable) {
     p.set("text", false)
 
     // get date metadata
-    val dateStr = retrieval.getDocument(name, p).metadata.get("date")
+    var dateStr = retrieval.getDocument(name, p).metadata.get("date")
     if(dateStr == null) {
       Console.printf("WARN: null date for doc `%s'\n", name)
       return -1
     }
+    dateStr = dateStr.filter(_.isDigit)
 
     // convert metadata to number, and store
     try {
@@ -78,19 +79,7 @@ class DateCache(val fileStore: String, val handler: Handler with Searchable) {
   }
 
   private def init() {
-    var lenIter = index.getLengthsIterator()
-
-    val context = new ScoringContext
-    lenIter.setContext(context)
-
-    while(!lenIter.isDone) {
-      val id = lenIter.currentCandidate
-      
-      context.document = id
-      lenIter.syncTo(id)
-
-      val len = lenIter.getCurrentLength
-
+    GalagoIndexUtil.forDocLenInIndex(index, (id, len) => {
       if(len > 0) { 
         val date = initDocDate(id)
 
@@ -100,8 +89,7 @@ class DateCache(val fileStore: String, val handler: Handler with Searchable) {
         dateToWordCount.adjustOrPutValue(date, len, len)
         dateToBookCount.adjustOrPutValue(date, 1, 1)
       }
-      lenIter.movePast(id)
-    }
+    })
 
     if(fileStore.length != 0) {
       saveToFile(fileStore)
