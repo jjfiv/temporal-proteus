@@ -29,21 +29,6 @@ object Hestia {
   }
 }
 
-object NiceIO {
-  import java.io._
-
-  def write(fileName: String, action: PrintWriter=>Unit) {
-    var fp = new PrintWriter(fileName)
-    try { action(fp) } finally { fp.close() }
-  }
-
-  def writeBinary(fileName: String, action: DataOutputStream=>Unit) {
-    var fp = new FileOutputStream(fileName)
-    var dataOutputStream = new DataOutputStream(fp)
-    try { action(dataOutputStream) } finally { fp.close() }
-  }
-}
-
 import org.lemurproject.galago.core.index.Index
 import org.lemurproject.galago.core.index.ValueIterator
 import org.lemurproject.galago.core.retrieval.iterator.MovableCountIterator
