@@ -1,4 +1,4 @@
-package ciir.proteus;
+package ciir.proteus.sample;
 
 import java.io.File
 import org.lemurproject.galago.tupleflow.Parameters
