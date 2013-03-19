@@ -8,6 +8,7 @@ import ciir.proteus.galago.DateCache
 import ciir.proteus.galago.{Handler, Searchable, WordHistory}
 import ciir.proteus.galago.CollectionHandler
 
+import org.lemurproject.galago.tupleflow.Utility
 import org.lemurproject.galago.tupleflow.Parameters
 import org.lemurproject.galago.core.retrieval.{Retrieval, LocalRetrieval}
 
@@ -67,15 +68,68 @@ object GalagoIndexUtil {
   }
 }
 
+object TimeCurve {
+  def unencode(dis: java.io.DataInputStream, numDates: Int): TimeCurve = {
+    var pts = new Array[Int](numDates)
+    var j=0
+    while(j < numDates) {
+      pts(j) = Utility.uncompressInt(dis)
+      j+=1
+    }
+    new TimeCurve(pts)
+  }
+
+  def compare(dateCache: DateCache, a: TimeCurve, b: TimeCurve): Double = {
+    def sqr(x: Double) = x*x
+    def safe_div(x: Int, y: Int): Double = {
+      return x.toDouble / y.toDouble
+    }
+
+    var score = 0.0
+
+    var i=0
+    while(i < a.size) {
+      val date = dateCache.minDate + i
+      val count = dateCache.wordCountForDate(date)
+      
+      if(count != 0) {
+        val maxFreq = count.toDouble
+        val x = a.data(i).toDouble / maxFreq
+        val y = b.data(i).toDouble / maxFreq
+
+        score += sqr(x - y)
+      }
+      i+=1
+    }
+
+    score
+  }
+}
+
+class TimeCurve(val data: Array[Int]) {
+  def encode(dos: java.io.DataOutputStream) {
+    data.foreach(Utility.compressInt(dos, _))
+  }
+
+  def size = data.size
+
+  def classifyAgainst(planeNormal: TimeCurve): Boolean = {
+    def sign[A](x: Int): Int = { if(x < 0) -1 else 1 }
+    // take the difference of each point, and dot product it, so as to classify input points as being either to the left or the right of it, represented as a boolean
+    planeNormal.data.zip(data).map({
+      case Tuple2(a, b) => sign(a - b)
+    }).sum >= 0
+  }
+
+}
 
 class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval: Retrieval, var index: Index) {
-  
   // for identifiying files
   val MagicNumber = 0xf0cabe14
 
   // updated by init or load
   var terms = Array[String]()
-  var freqData = Array[Array[Int]]()
+  var freqData = Array[TimeCurve]()
   
   val t0 = System.currentTimeMillis
   if(Util.fileExists(fileStore)) {
@@ -87,10 +141,9 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
   println("Init Vocabulary in "+(tf-t0)+"ms!")
   
   def init() = {
-    
     var total = 0
     var keyBuilder = new ArrayBuffer[String]()
-    var curveBuilder = new ArrayBuffer[Array[Int]]()
+    var curveBuilder = new ArrayBuffer[TimeCurve]()
 
     GalagoIndexUtil.forKeyInIndex(index, "postings.porter", (key, valueIter) => {
       total += 1
@@ -126,7 +179,7 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
           i+=1
         }
 
-        curveBuilder += results
+        curveBuilder += new TimeCurve(results)
       }
     })
 
@@ -135,11 +188,9 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
     terms = keyBuilder.result.toArray
     freqData = curveBuilder.result.toArray
 
-    /*
     if(fileStore.length != 0) {
       saveToFile(fileStore)
     }
-    */
   }
 
   def loadFromFile(fileName: String) {
@@ -156,17 +207,33 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
       }
 
       val count = dis.readInt
-      
-      var keyBuilder = Vector.newBuilder[String]
+      val minDate = dis.readInt
+      val maxDate = dis.readInt
 
-      for(i <- 0 until count) {
+      if(minDate != dateCache.minDate || maxDate != dateCache.maxDate) {
+        println("Dates messed up!")
+        sys.exit(-1)
+        throw new Error
+      }
+      val numDates = (maxDate - minDate)+1
+      
+      var keyBuilder = new ArrayBuffer[String]()
+      var curveBuilder = new ArrayBuffer[TimeCurve]()
+
+      var i=0
+      while(i < count) {
         val str = dis.readUTF
-        if(i % 10 == 0) {
-          keyBuilder += str
-        }
+        keyBuilder += str
+
+        if(i % 10000 == 0) { printf("load: %1.2f%%\n",100.0*(i.toDouble/count.toDouble)); }
+
+        curveBuilder += TimeCurve.unencode(dis, numDates)
+        i+=1
       }
 
       terms = keyBuilder.result.toArray
+      freqData = curveBuilder.result.toArray
+
       error = false
     } catch {
       case err: Error => { }
@@ -186,9 +253,17 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
       dos.writeInt(MagicNumber)
       dos.writeInt(terms.size)
 
-      terms.foreach(s => {
-        dos.writeUTF(s)
-      })
+      dos.writeInt(dateCache.minDate)
+      dos.writeInt(dateCache.maxDate)
+
+      var i=0
+      while(i < terms.size) {
+        if(i % 10000 == 0) { println(i); println(freqData(i).size); println(terms(i)) }
+        dos.writeUTF(terms(i))
+        freqData(i).encode(dos)
+
+        i+=1
+      }
 
     } finally {
       fos.close()
@@ -199,7 +274,7 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
 object CurveDataBuilder {
   var dateCache: DateCache = null
 
-  def queryToWordCurve(retrieval: Retrieval, query: String): Array[Int] = {
+  def queryToWordCurve(retrieval: Retrieval, query: String): TimeCurve = {
     val numDates = (dateCache.maxDate - dateCache.minDate) + 1
     var results = new Array[Int](numDates)
 
@@ -216,44 +291,10 @@ object CurveDataBuilder {
       }
     })
     
-    results
+    new TimeCurve(results)
   }
 
-  def diffCurve(a: Array[Int], b: Array[Int]): Double = {
-    def sqr(x: Double) = x*x
-    def safe_div(x: Int, y: Int): Double = {
-      return x.toDouble / y.toDouble
-    }
-
-    var score = 0.0
-
-    var i=0
-    while(i < a.size) {
-      val date = dateCache.minDate + i
-      val count = dateCache.wordCountForDate(date)
-      
-      if(count != 0) {
-        val maxFreq = count.toDouble
-        val x = a(i).toDouble / maxFreq
-        val y = b(i).toDouble / maxFreq
-
-        score += sqr(x - y)
-      }
-      i+=1
-    }
-
-    score
-  }
-
-  def classifyCurve(planeNormal: Array[Int], dataPoint: Array[Int]): Boolean = {
-    def sign[A](x: Int): Int = { if(x < 0) -1 else 1 }
-    // take the difference of each point, and dot product it, so as to classify input points as being either to the left or the right of it, represented as a boolean
-    planeNormal.zip(dataPoint).map({
-      case Tuple2(norm, data) => sign(norm - data)
-    }).sum >= 0
-  }
-
-  def curveBasedQuery(term: String, retrieval: LocalRetrieval, data: Array[Array[Int]]): Array[Double] = {
+  def curveBasedQuery(term: String, retrieval: LocalRetrieval, data: Array[TimeCurve]): Array[Double] = {
     val queryCurve = queryToWordCurve(retrieval, term)
     
     var i=0
@@ -261,7 +302,7 @@ object CurveDataBuilder {
     var scores = new Array[Double](vlen)
     
     while(i < vlen) {
-      scores(i) = diffCurve(queryCurve, data(i))
+      scores(i) = TimeCurve.compare(dateCache, queryCurve, data(i))
       i+=1
     }
 
@@ -288,7 +329,7 @@ object CurveDataBuilder {
 
     // create dated vocabulary
     val vocab = Util.timed("Creating or Loading Vocabulary", {
-      new Vocabulary(dateCache, handlerParms.getString("curveVocabCache"), retrieval, index)
+      new Vocabulary(dateCache, handlerParms.getString("curveCache"), retrieval, index)
     })
 
     // TODO, LSH
@@ -297,7 +338,7 @@ object CurveDataBuilder {
       val randomPlane = dateCache.domain.map(x => randomizer.nextInt)
       
       val start_partition = System.currentTimeMillis
-      val (vocabA, vocabB) = vocab.terms.partition(classifyCurve(randomPlane, _))
+      val (vocabA, vocabB) = vocab.terms.partition(_.classifyAgainst(randomPlane))
       val end_partition = System.currentTimeMillis
       println("Partitioning took " + (end_partition-start_partition) + "ms!")
     */
