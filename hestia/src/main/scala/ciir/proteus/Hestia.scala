@@ -54,16 +54,15 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
       if(numDocs >= 2) {
         keyBuilder += key
 
-        val numDates = (dateCache.maxDate - dateCache.minDate) + 1
-        var results = Array.fill(numDates) { 0 }
+        var results = new TIntIntHashMap
 
-        results
+        val numDates = (dateCache.maxDate - dateCache.minDate) + 1
+
         var i = 0
         while(i < numDocs) {
           val date = dateCache.dateForDoc(docsForKey(i))
-          if(date != -1) {
-            val index = date - dateCache.minDate
-            results(index) += countsForKey(i)
+          if(date > 0) {
+            results.adjustOrPutValue(date, countsForKey(i), countsForKey(i))
           }
           
           i+=1
@@ -163,8 +162,7 @@ object CurveDataBuilder {
   var dateCache: DateCache = null
 
   def queryToWordCurve(retrieval: Retrieval, query: String): TimeCurve = {
-    val numDates = (dateCache.maxDate - dateCache.minDate) + 1
-    var results = new Array[Int](numDates)
+    var results = new TIntIntHashMap
 
     // run query
     val (_, sdocs) = WordHistory.runQuery(retrieval, query)
@@ -174,8 +172,7 @@ object CurveDataBuilder {
       val date = dateCache.dateForDoc(sdoc.document)
       if(date > 0) {
         val score = sdoc.score.toInt
-        val index = date - dateCache.minDate
-        results(index) += score
+        results.adjustOrPutValue(date, score, score)
       }
     })
     
@@ -190,7 +187,7 @@ object CurveDataBuilder {
     var scores = new Array[Double](vlen)
     
     while(i < vlen) {
-      scores(i) = TimeCurve.compare(dateCache, queryCurve, data(i))
+      scores(i) = queryCurve.score(data(i), dateCache)
       i+=1
     }
 
