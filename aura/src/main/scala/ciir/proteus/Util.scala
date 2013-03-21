@@ -64,6 +64,16 @@ object GalagoIndexUtil {
       keyIter.nextKey
     }
   }
+  
+  def forDocInInvertedList(iter: MovableCountIterator, block: (Int,Int)=>Unit) {
+    while(!iter.isDone) {
+      val doc = iter.currentCandidate
+      iter.getContext.document = doc
+      val count = iter.count()
+      block(doc, count)
+      iter.movePast(doc)
+    }
+  }
 
   def forDocInIndex(index: Index, block: Int=>Unit) {
     var lenIter = index.getLengthsIterator
@@ -74,6 +84,7 @@ object GalagoIndexUtil {
       lenIter.movePast(id)
     }
   }
+
 
   def forDocLenInIndex(index: Index, block: (Int,Int)=>Unit) {
     var lenIter = index.getLengthsIterator

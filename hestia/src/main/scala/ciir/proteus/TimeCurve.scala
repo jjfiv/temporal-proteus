@@ -49,7 +49,7 @@ object TimeCurve {
     val numDates = dateCache.numDates
     val minDate = dateCache.minDate
     var arr = new Array[Int](numDates)
-    
+
     data.keys.foreach(date => {
       val count = data.get(date)
       if(count > 0 && date > 0) {
@@ -61,7 +61,7 @@ object TimeCurve {
           println(numDates)
           assert(false)
         }
-        arr(index) = count
+        arr(index) += count
       }
     })
 

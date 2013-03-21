@@ -42,12 +42,11 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
 
       var docsForKey = new ArrayBuffer[Int]()
       var countsForKey = new ArrayBuffer[Int]()
-      while(!valueIter.isDone) {
-        val doc = valueIter.currentCandidate
+      
+      GalagoIndexUtil.forDocInInvertedList(valueIter, (doc, count) => {
         docsForKey += doc
-        countsForKey += valueIter.count()
-        valueIter.movePast(doc)
-      }
+        countsForKey += count
+      })
 
       var numDocs = docsForKey.size
 
@@ -101,8 +100,11 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
       while(i < count) {
         if(i % 10000 == 0) { println("load vocab "+i); }
 
-        keyBuilder += dis.readUTF
-        curveBuilder += TimeCurve.unencode(dis, dateCache)
+        val term = dis.readUTF
+        val curve = TimeCurve.unencode(dis, dateCache)
+
+        keyBuilder += term
+        curveBuilder += curve
 
         i+=1
       }
@@ -171,9 +173,9 @@ object CurveDataBuilder {
     var i=0
     val vlen = data.size
     var scores = new Array[Double](vlen)
-    
+
     while(i < vlen) {
-      if(i % 10000 == 0) { println("query "+i) }
+      //if(i % 10000 == 0) { println("query "+i) }
       scores(i) = queryCurve.score(data(i))
       i+=1
     }
@@ -215,21 +217,26 @@ object CurveDataBuilder {
       println("Partitioning took " + (end_partition-start_partition) + "ms!")
     */
 
-    // run query
-    val scores = Util.timed("Scoring", {
-      curveBasedQuery("lincoln", retrieval, vocab.freqData)
-    })
+    def jfQuery(term: String) {
+      // run query
+      val scores = Util.timed("Scoring", {
+        curveBasedQuery(term, retrieval, vocab.freqData)
+      })
 
-    println("Union Time: " + TimeCurve.unionTime)
-    println("Compare Time: " + TimeCurve.compareTime)
-    
-    val numResults = 20
-    // sort and trim to numResults
-    val scored_terms = Util.timed("Sorting", {
-      scores.zip(vocab.terms).sortBy(Util.firstOfPair).take(numResults)
-    })
+      val numResults = 50
+      // sort and trim to numResults
+      val scored_terms = Util.timed("Sorting", {
+        scores.zip(vocab.terms).sortBy(Util.firstOfPair).take(numResults)
+      })
 
-    scored_terms.map(println)
+      scored_terms.map(println)
+    }
+
+
+
+    jfQuery("lincoln")
+    //jfQuery("abraham")
+
   }
 }
 
