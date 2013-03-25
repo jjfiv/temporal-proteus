@@ -13,6 +13,8 @@ import org.lemurproject.galago.tupleflow.Parameters
 import org.lemurproject.galago.core.retrieval.{Retrieval, LocalRetrieval}
 import org.lemurproject.galago.tupleflow.StreamCreator
 
+sealed case class ScoredTerm(term: String, score: Double);
+
 class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval: Retrieval, var index: Index) {
   // for identifiying files
   val MagicNumber = 0xf0cabe14
@@ -65,7 +67,7 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
           i+=1
         }
 
-        curveBuilder += TimeCurve.ofTroveMap(dateCache, results)
+        curveBuilder += TimeCurve.ofTroveMap(dateCache, key, results)
       }
     })
 
@@ -101,7 +103,7 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
         if(i % 10000 == 0) { println("load vocab "+i); }
 
         val term = dis.readUTF
-        val curve = TimeCurve.unencode(dis, dateCache)
+        val curve = TimeCurve.unencode(dis, term, dateCache)
 
         keyBuilder += term
         curveBuilder += curve
@@ -164,19 +166,20 @@ object CurveDataBuilder {
       }
     })
     
-    TimeCurve.ofTroveMap(dateCache, results)
+    TimeCurve.ofTroveMap(dateCache, query, results)
   }
 
-  def curveBasedQuery(term: String, retrieval: LocalRetrieval, data: Array[TimeCurve]): Array[Double] = {
+  def curveBasedQuery(term: String, retrieval: LocalRetrieval, data: Array[TimeCurve]): Array[ScoredTerm] = {
     val queryCurve = queryToWordCurve(retrieval, term)
     
     var i=0
     val vlen = data.size
-    var scores = new Array[Double](vlen)
+    var scores = new Array[ScoredTerm](vlen)
 
     while(i < vlen) {
       //if(i % 10000 == 0) { println("query "+i) }
-      scores(i) = queryCurve.score(data(i))
+      val score = queryCurve.score(data(i))
+      scores(i) = ScoredTerm(data(i).term, score)
       i+=1
     }
 
@@ -219,20 +222,18 @@ object CurveDataBuilder {
 
     def jfQuery(term: String) {
       // run query
-      val scores = Util.timed("Scoring", {
+      val scoredCurves = Util.timed("Scoring", {
         curveBasedQuery(term, retrieval, vocab.freqData)
       })
 
       val numResults = 50
       // sort and trim to numResults
-      val scored_terms = Util.timed("Sorting", {
-        scores.zip(vocab.terms).sortBy(Util.firstOfPair).take(numResults)
+      val topResults = Util.timed("Sorting", {
+        scoredCurves.sortBy(_.score).take(numResults)
       })
 
-      scored_terms.map(println)
+      topResults.map(println)
     }
-
-
 
     jfQuery("lincoln")
     //jfQuery("abraham")

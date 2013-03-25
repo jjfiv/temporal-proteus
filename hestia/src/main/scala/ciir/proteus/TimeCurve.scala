@@ -33,7 +33,7 @@ object TimeCurve {
     }
   }
 
-  def unencode(dis: java.io.DataInputStream, dateCache: DateCache): TimeCurve = {
+  def unencode(dis: java.io.DataInputStream, term: String, dateCache: DateCache): TimeCurve = {
     var pts = new TIntIntHashMap
     val size = dis.readInt
 
@@ -42,10 +42,10 @@ object TimeCurve {
       val count = dis.readShort
       pts.put(date, count)
     }
-    TimeCurve.ofTroveMap(dateCache, pts)
+    TimeCurve.ofTroveMap(dateCache, term, pts)
   }
 
-  def ofTroveMap(dateCache: DateCache, data: TIntIntHashMap) = {
+  def ofTroveMap(dateCache: DateCache, term: String, data: TIntIntHashMap) = {
     val numDates = dateCache.numDates
     val minDate = dateCache.minDate
     var arr = new Array[Int](numDates)
@@ -65,12 +65,12 @@ object TimeCurve {
       }
     })
 
-    new TimeCurve(dateCache, arr)
+    new TimeCurve(dateCache, term, arr)
   }
 }
 
 // sparse representation of time curve more efficient?
-class TimeCurve(val dateCache: DateCache, val data: Array[Int]) {
+class TimeCurve(val dateCache: DateCache, val term: String, val data: Array[Int]) {
   
   def score(against: TimeCurve): Double = {
     def sqr(x: Double) = x*x
@@ -98,19 +98,4 @@ class TimeCurve(val dateCache: DateCache, val data: Array[Int]) {
   }
 
 }
-
-/*
-class TimeCurve(val data: Array[Int]) {
-  def size = data.size
-
-  def classifyAgainst(planeNormal: TimeCurve): Boolean = {
-    def sign[A](x: Int): Int = { if(x < 0) -1 else 1 }
-    // take the difference of each point, and dot product it, so as to classify input points as being either to the left or the right of it, represented as a boolean
-    planeNormal.data.zip(data).map({
-      case Tuple2(a, b) => sign(a - b)
-    }).sum >= 0
-  }
-}
-*/
-
 
