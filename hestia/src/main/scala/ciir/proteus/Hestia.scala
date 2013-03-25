@@ -15,6 +15,28 @@ import org.lemurproject.galago.tupleflow.StreamCreator
 
 sealed case class ScoredTerm(term: String, score: Double);
 
+class RankedList(val numHits: Int) {
+  var results = new Array[ScoredTerm](numHits)
+  var count = 0
+
+  def insert(newest: ScoredTerm) {
+    if(count < numHits) {
+      results(count) = newest
+      count += 1
+      return
+    }
+
+    // discard new things with tiny scores, special case
+    if(results.last.score < newest.score) {
+      return
+    }
+
+    // chop current array in pieces and reassemble
+    val (better, worse) = results.partition(res => res.score < newest.score)
+    results = (better :+ newest) ++ worse.dropRight(1)
+  }
+}
+
 class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval: Retrieval, var index: Index) {
   // for identifiying files
   val MagicNumber = 0xf0cabe14
@@ -169,23 +191,6 @@ object CurveDataBuilder {
     TimeCurve.ofTroveMap(dateCache, query, results)
   }
 
-  def curveBasedQuery(term: String, retrieval: LocalRetrieval, data: Array[TimeCurve]): Array[ScoredTerm] = {
-    val queryCurve = queryToWordCurve(retrieval, term)
-    
-    var i=0
-    val vlen = data.size
-    var scores = new Array[ScoredTerm](vlen)
-
-    while(i < vlen) {
-      //if(i % 10000 == 0) { println("query "+i) }
-      val score = queryCurve.score(data(i))
-      scores(i) = ScoredTerm(data(i).term, score)
-      i+=1
-    }
-
-    scores
-  }
-
   def main(args: Array[String]) {
     val parameters = Util.argsAsJSON(args)
 
@@ -209,30 +214,38 @@ object CurveDataBuilder {
       new Vocabulary(dateCache, handlerParms.getString("curveCache"), retrieval, index)
     })
 
+    val originalVocab = vocab.freqData
     // TODO, LSH
-    /*
-      var randomizer = new util.Random(13)
-      val randomPlane = dateCache.domain.map(x => randomizer.nextInt)
-      
-      val start_partition = System.currentTimeMillis
-      val (vocabA, vocabB) = vocab.terms.partition(_.classifyAgainst(randomPlane))
-      val end_partition = System.currentTimeMillis
-      println("Partitioning took " + (end_partition-start_partition) + "ms!")
-    */
+    
+    var randomizer = new util.Random(13)
+    val randomPlane = new TimeCurve(dateCache, "hash0", dateCache.domain.map(x => randomizer.nextInt).toArray)
+    
+    val (vocabA, vocabB) = Util.timed("LSH Partitioning", {
+      originalVocab.partition(_.classify(randomPlane))
+    })
 
     def jfQuery(term: String) {
+      val numResults = 50
+
       // run query
       val scoredCurves = Util.timed("Scoring", {
-        curveBasedQuery(term, retrieval, vocab.freqData)
+        val queryCurve = queryToWordCurve(retrieval, term)
+
+        val hash = queryCurve.classify(randomPlane)
+
+        val data = if (hash) { vocabA } else { vocabB }
+
+        val vlen = data.size
+        var rl = new RankedList(numResults)
+
+        data.foreach( timeCurve => {
+          rl.insert(ScoredTerm(timeCurve.term, queryCurve.score(timeCurve)))
+        })
+
+        rl.results
       })
 
-      val numResults = 50
-      // sort and trim to numResults
-      val topResults = Util.timed("Sorting", {
-        scoredCurves.sortBy(_.score).take(numResults)
-      })
-
-      topResults.map(println)
+      scoredCurves.map(println)
     }
 
     jfQuery("lincoln")

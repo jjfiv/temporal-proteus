@@ -71,6 +71,7 @@ object TimeCurve {
 
 // sparse representation of time curve more efficient?
 class TimeCurve(val dateCache: DateCache, val term: String, val data: Array[Int]) {
+  assert(data.size == dateCache.domain.size)
   
   def score(against: TimeCurve): Double = {
     def sqr(x: Double) = x*x
@@ -97,5 +98,19 @@ class TimeCurve(val dateCache: DateCache, val term: String, val data: Array[Int]
     score
   }
 
+  // boolean dot product based on sign
+  def classify(against: TimeCurve): Boolean = {
+    val a = data
+    val b = against.data
+
+    var dotProduct = 0
+    var i=0
+    while(i < a.size) {
+      dotProduct += a(i) * b(i)
+      i+=1
+    }
+    
+    dotProduct >= 0
+  }
 }
 
