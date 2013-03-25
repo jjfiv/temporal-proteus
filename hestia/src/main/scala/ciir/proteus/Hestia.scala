@@ -13,30 +13,6 @@ import org.lemurproject.galago.tupleflow.Parameters
 import org.lemurproject.galago.core.retrieval.{Retrieval, LocalRetrieval}
 import org.lemurproject.galago.tupleflow.StreamCreator
 
-sealed case class ScoredTerm(term: String, score: Double);
-
-class RankedList(val numHits: Int) {
-  var results = new Array[ScoredTerm](numHits)
-  var count = 0
-
-  def insert(newest: ScoredTerm) {
-    if(count < numHits) {
-      results(count) = newest
-      count += 1
-      return
-    }
-
-    // discard new things with tiny scores, special case
-    if(results.last.score < newest.score) {
-      return
-    }
-
-    // chop current array in pieces and reassemble
-    val (better, worse) = results.partition(res => res.score < newest.score)
-    results = (better :+ newest) ++ worse.dropRight(1)
-  }
-}
-
 class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval: Retrieval, var index: Index) {
   // for identifiying files
   val MagicNumber = 0xf0cabe14
@@ -170,10 +146,15 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
   }
 }
 
-object CurveDataBuilder {
-  var dateCache: DateCache = null
+trait CurveMaker {
+  def search(query: String): TimeCurve
+  def domain: Range
+  def fromData(name: String, data: Array[Int]): TimeCurve
+}
 
-  def queryToWordCurve(retrieval: Retrieval, query: String): TimeCurve = {
+case class GalagoCurveMaker(retrieval: Retrieval, dateCache: DateCache) extends CurveMaker {
+  def domain = dateCache.domain
+  def search(query: String): TimeCurve = {
     var results = new TIntIntHashMap
 
     // run query
@@ -190,6 +171,11 @@ object CurveDataBuilder {
     
     TimeCurve.ofTroveMap(dateCache, query, results)
   }
+  def fromData(name: String, data: Array[Int]) = new TimeCurve(dateCache, name, data)
+}
+
+object CurveDataBuilder {
+  var dateCache: DateCache = null
 
   def main(args: Array[String]) {
     val parameters = Util.argsAsJSON(args)
@@ -209,40 +195,26 @@ object CurveDataBuilder {
     // grab date lookup tool
     dateCache = handler.asInstanceOf[CollectionHandler].dateCache
 
+    val curveMaker = GalagoCurveMaker(retrieval, dateCache)
+
     // create dated vocabulary
     val vocab = Util.timed("Creating or Loading Vocabulary", {
       new Vocabulary(dateCache, handlerParms.getString("curveCache"), retrieval, index)
     })
 
     val originalVocab = vocab.freqData
-    // TODO, LSH
-    
-    var randomizer = new util.Random(13)
-    val randomPlane = new TimeCurve(dateCache, "hash0", dateCache.domain.map(x => randomizer.nextInt).toArray)
-    
-    val (vocabA, vocabB) = Util.timed("LSH Partitioning", {
-      originalVocab.partition(_.classify(randomPlane))
-    })
 
+    val bfSearch = new BruteForceSearch(curveMaker, originalVocab)
+    val binLSHSearch = new BinaryLSHSearch(curveMaker, originalVocab)
+
+    val currentSearch: CurveSearch = binLSHSearch
+    
     def jfQuery(term: String) {
       val numResults = 50
 
       // run query
       val scoredCurves = Util.timed("Scoring", {
-        val queryCurve = queryToWordCurve(retrieval, term)
-
-        val hash = queryCurve.classify(randomPlane)
-
-        val data = if (hash) { vocabA } else { vocabB }
-
-        val vlen = data.size
-        var rl = new RankedList(numResults)
-
-        data.foreach( timeCurve => {
-          rl.insert(ScoredTerm(timeCurve.term, queryCurve.score(timeCurve)))
-        })
-
-        rl.results
+        currentSearch.run(term, numResults)
       })
 
       scoredCurves.map(println)
