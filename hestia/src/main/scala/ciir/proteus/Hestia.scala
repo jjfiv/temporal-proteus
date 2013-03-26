@@ -207,22 +207,43 @@ object CurveDataBuilder {
     val bfSearch = new BruteForceSearch(curveMaker, originalVocab)
     val binLSHSearch = new BinaryLSHSearch(curveMaker, originalVocab)
 
-    val currentSearch: CurveSearch = binLSHSearch
-    
-    def jfQuery(term: String) {
-      val numResults = 50
+    val query = "lincoln"
+    val numRelevant = 100
+    val numPossible = originalVocab.size
 
-      // run query
-      val scoredCurves = Util.timed("Scoring", {
-        currentSearch.run(term, numResults)
-      })
+    // use the brute-force search as our ground truth to select the top 100 terms and call these relevant
+    val relevantTerms = bfSearch.run(query, numRelevant).map(_.term).toSet
+    assert(relevantTerms.contains(query))
 
-      scoredCurves.map(println)
+    // now evaluate the search method in currentSearch
+    //val currentSearch: CurveSearch = binLSHSearch
+
+    def evaluate(currentSearch: CurveSearch) {
+      println("")
+      println("==")
+
+      val rankedList = currentSearch.run(query, numPossible).map(_.term)
+      val retrievedTerms = rankedList.take(numRelevant).toSet
+      
+      val rrTerms = relevantTerms.intersect(retrievedTerms)
+      
+      printf("Terms Retrieved: %d, Terms Relevant: %d\n", retrievedTerms.size, rrTerms.size)
+      
+      val precision = Util.fraction(rrTerms.size, retrievedTerms.size)
+      val recall = Util.fraction(rrTerms.size, retrievedTerms.size)
+      val fmeasure = Util.harmonicMean(precision, recall)
+
+      printf("Precision: %1.4f\n", precision)
+      printf("Recall: %1.4f\n", recall)
+      printf("F1: %1.4f\n", fmeasure)
+      
+      val topRank = rankedList.indexOf(query)+1
+      printf("Rank of Top Hit: %d ; MRR = %1.4f\n",
+        topRank, Util.fraction(1, topRank))
     }
 
-    jfQuery("lincoln")
-    //jfQuery("abraham")
-
+    evaluate(binLSHSearch)
+    evaluate(new SampledSearch(curveMaker, originalVocab))
   }
 }
 

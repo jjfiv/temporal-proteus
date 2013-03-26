@@ -47,6 +47,14 @@ object Util {
     println("timed: \""+desc+"\" took "+(tf-ti)+"ms!")
     result
   }
+  def fraction(a: Int, b: Int): Double = {
+    if(b == 0) {
+      0.0
+    } else {
+      a.toDouble / b.toDouble
+    }
+  }
+  def harmonicMean(a: Double, b: Double) = { (2*a*b) / (a+b) }
 }
 
 object GalagoIndexUtil {
