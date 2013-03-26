@@ -223,14 +223,26 @@ object CurveDataBuilder {
       println("==")
 
       val rankedList = currentSearch.run(query, numPossible).map(_.term)
-      val retrievedTerms = rankedList.take(numRelevant).toSet
+      
+      //val retrievedTerms = rankedList.take(numRelevant).toSet
+      // take as many as necessary to find all relevant documents
+      var relCount = 0
+      var retCount = 0
+      while(relCount < numRelevant && retCount < rankedList.size) {
+        if(relevantTerms.contains(rankedList(retCount))) {
+          relCount += 1
+        }
+        retCount += 1
+      }
+      val retrievedTerms = rankedList.take(retCount).toSet
+
       
       val rrTerms = relevantTerms.intersect(retrievedTerms)
       
       printf("Terms Retrieved: %d, Terms Relevant: %d\n", retrievedTerms.size, rrTerms.size)
       
       val precision = Util.fraction(rrTerms.size, retrievedTerms.size)
-      val recall = Util.fraction(rrTerms.size, retrievedTerms.size)
+      val recall = Util.fraction(rrTerms.size, numRelevant)
       val fmeasure = Util.harmonicMean(precision, recall)
 
       printf("Precision: %1.4f\n", precision)
