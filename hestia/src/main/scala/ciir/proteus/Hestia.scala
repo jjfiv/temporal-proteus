@@ -149,7 +149,12 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
 trait CurveMaker {
   def search(query: String): TimeCurve
   def domain: Range
+  def maxForYear(year: Int): Int
   def fromData(name: String, data: Array[Int]): TimeCurve
+
+  // defined in terms of above primitives
+  def maxArray = domain.map(maxForYear).toArray
+  def maxCurve = fromData("__MAX__", maxArray)
 }
 
 case class GalagoCurveMaker(retrieval: Retrieval, dateCache: DateCache) extends CurveMaker {
@@ -171,6 +176,7 @@ case class GalagoCurveMaker(retrieval: Retrieval, dateCache: DateCache) extends 
     
     TimeCurve.ofTroveMap(dateCache, query, results)
   }
+  def maxForYear(year: Int) = dateCache.wordCountForDate(year)
   def fromData(name: String, data: Array[Int]) = new TimeCurve(dateCache, name, data)
 }
 
@@ -261,7 +267,6 @@ object CurveDataBuilder {
 
     evaluate(binLSHSearch)
     evaluate(new LSHSearch(curveMaker, originalVocab))
-    evaluate(new SampledSearch(curveMaker, originalVocab))
   }
 }
 

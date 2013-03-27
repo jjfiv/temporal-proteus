@@ -51,28 +51,6 @@ class BruteForceSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve])
   def name = "Brute Force Search"
 }
 
-class SampledSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) extends CurveSearch {
-  val CurveDist = 10
-
-  def run(query: String, numResults: Int) = {
-    val queryCurve = curveMaker.search(query)
-    var rl = new RankedList(numResults)
-
-    var i=0
-    val len = corpus.size
-    while(i < len) {
-      if(i % CurveDist == 0) {
-        val timeCurve = corpus(i)
-        rl.insert(ScoredTerm(timeCurve.term, queryCurve.score(timeCurve)))
-      }
-      i+=1
-    }
-
-    rl.done
-  }
-
-  def name = "Sampled (every " + CurveDist + ") Search"
-}
 class BinaryLSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) extends CurveSearch {
   var randomizer = new util.Random(13)
   val randomPlane = curveMaker.fromData("hash0", curveMaker.domain.map(x => randomizer.nextInt).toArray)
@@ -100,29 +78,54 @@ class BinaryLSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) 
 }
 
 class LSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) extends CurveSearch {
-  val numBits = 4
+  val numBits = 3
+  val numBucketSets = 2
   var randomizer = new util.Random(13)
+
+  def allBucketSets = 0 until numBucketSets 
+  def allBucketBits = 0 until numBits
+  def allBuckets = 0 until (1 << numBits)
   
-  // generate random planes
-  val hashPlanes = (0 until numBits).map(index => {
-    curveMaker.fromData("hash"+index, curveMaker.domain.map(x => randomizer.nextInt).toArray)
+  // generate random planes with max values
+  val maxValues = curveMaker.maxArray
+  
+  /*
+    // generate curve using max values (leads to more uneven buckets, but try this with more than one query)
+    def generateRandomCurve(index: Int) = maxValues.map(maxForYear => (randomizer.nextInt % maxForYear))
+  */
+  def generateRandomCurve(index: Int) = maxValues.map(ignored => randomizer.nextInt)
+  
+  val hashPlanes: IndexedSeq[IndexedSeq[TimeCurve]] = allBucketSets.map(ignored => {
+    allBucketBits.map(index => {
+      curveMaker.fromData("hash"+index, generateRandomCurve(index).toArray)
+    })
   })
 
-  val hashBuckets = buildBucketsFromCorpus()
+  val hashBuckets: Array[Array[Set[Int]]] = buildBucketsFromCorpus()
   
   private def buildBucketsFromCorpus() = {
-    // make 2^numBits bucket builders...
-    var bucketBuilders = (0 until (1 << numBits)).map(x => Array.newBuilder[TimeCurve])
-
-    corpus.foreach(timeCurve => {
-      val bucketNumber = hash(timeCurve)
-      assert(bucketNumber >= 0 && bucketNumber < (1 << numBits))
-      bucketBuilders(bucketNumber) += timeCurve
+    // make numBucketSets * (2^numBits) bucket builders...
+    var bucketBuilders = allBucketSets.map(bktsetno => {
+      allBuckets.map(bktno => Array.newBuilder[Int])
     })
+
+    corpus.zipWithIndex.foreach({ case Tuple2(timeCurve, index) => {
+      allBucketSets.foreach(bktSetNo => {
+        val bucketNumber = hash(bktSetNo, timeCurve)
+        assert(bucketNumber >= 0 && bucketNumber < (1 << numBits))
+        bucketBuilders(bktSetNo)(bucketNumber) += index
+      })
+    }})
     
-    val buckets = bucketBuilders.map(_.result).toArray
+    val buckets = bucketBuilders.map(_.map(_.result.toSet).toArray).toArray
+    
     println("Bucket overview:")
-    buckets.foreach( bkt => println("B: "+ bkt.size) )
+    buckets.foreach {
+      bset => println("Set::");
+      bset.foreach {
+        bkt => println("  B: "+ bkt.size)
+      }
+    }
 
     buckets
   }
@@ -137,24 +140,28 @@ class LSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) extend
     mask
   }
 
-  def hash(curve: TimeCurve) = { 
-    boolsToIntBits(hashPlanes.map(_.classify(curve)))
+  def hash(bktSetNo:Int, curve: TimeCurve) = { 
+    boolsToIntBits(hashPlanes(bktSetNo).map(_.classify(curve)))
   }
 
   def run(query: String, numResults: Int) = {
     val queryCurve = curveMaker.search(query)
     var rl = new RankedList(numResults)
 
-    val data = hashBuckets(hash(queryCurve))
 
-    data.foreach(timeCurve => {
+    val data = allBucketSets.map(bktSetNo => {
+      hashBuckets(bktSetNo)(hash(bktSetNo, queryCurve))
+    }).foldLeft(Set.empty[Int])((accum, cur) => { accum | cur })
+
+    data.foreach(index => {
+      val timeCurve = corpus(index)
       rl.insert(ScoredTerm(timeCurve.term, queryCurve.score(timeCurve)))
     })
 
     rl.done
   }
   
-  def name = "Curve-based LSH, " + hashBuckets.size + " buckets!"
+  def name = "Curve-based LSH, " + hashBuckets.size + "x" + hashBuckets(0).size + " buckets!"
 }
 
 
