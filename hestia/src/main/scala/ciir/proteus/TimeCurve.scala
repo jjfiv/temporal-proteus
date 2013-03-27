@@ -72,7 +72,42 @@ object TimeCurve {
 // sparse representation of time curve more efficient?
 class TimeCurve(val dateCache: DateCache, val term: String, val data: Array[Int]) {
   assert(data.size == dateCache.domain.size)
+  if(data.sum == 0) {
+    println(term)
+  }
   
+  // cosine similarity
+  def score(against: TimeCurve): Double = {
+    def sqr(x: Double) = x*x
+
+    val a = data
+    val b = against.data
+
+    var dotProduct = 0.0
+    var magA = 0.0
+    var magB = 0.0
+
+    var i=0
+    while(i < a.size) {
+      val date = dateCache.minDate + i
+      val count = dateCache.wordCountForDate(date)
+      
+      if(count != 0) {
+        val maxFreq = count.toDouble
+        val x = a(i).toDouble / maxFreq
+        val y = b(i).toDouble / maxFreq
+
+        dotProduct += x*y
+        magA += x*x
+        magB += y*y
+      }
+      i+=1
+    }
+
+    1.0 - (dotProduct / (math.sqrt(magA)*math.sqrt(magB)))
+  }
+  // customized measure
+  /*
   def score(against: TimeCurve): Double = {
     def sqr(x: Double) = x*x
 
@@ -97,6 +132,7 @@ class TimeCurve(val dateCache: DateCache, val term: String, val data: Array[Int]
 
     score
   }
+  */
 
   // boolean dot product based on sign
   def classify(against: TimeCurve): Boolean = {

@@ -78,8 +78,8 @@ class BinaryLSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) 
 }
 
 class LSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) extends CurveSearch {
-  val numBits = 3
-  val numBucketSets = 2
+  val numBits = 4
+  val numBucketSets = 3
   var randomizer = new util.Random(13)
 
   def allBucketSets = 0 until numBucketSets 
@@ -89,11 +89,11 @@ class LSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) extend
   // generate random planes with max values
   val maxValues = curveMaker.maxArray
   
-  /*
-    // generate curve using max values (leads to more uneven buckets, but try this with more than one query)
-    def generateRandomCurve(index: Int) = maxValues.map(maxForYear => (randomizer.nextInt % maxForYear))
-  */
-  def generateRandomCurve(index: Int) = maxValues.map(ignored => randomizer.nextInt)
+  
+  // generate curve using max values (leads to more uneven buckets, but try this with more than one query)
+  def generateRandomCurve(index: Int) = maxValues.map(maxForYear => if (maxForYear == 0) 1 else (randomizer.nextInt % maxForYear))
+  
+  //def generateRandomCurve(index: Int) = maxValues.map(ignored => randomizer.nextInt)
   
   val hashPlanes: IndexedSeq[IndexedSeq[TimeCurve]] = allBucketSets.map(ignored => {
     allBucketBits.map(index => {

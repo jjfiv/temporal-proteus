@@ -103,8 +103,10 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
         val term = dis.readUTF
         val curve = TimeCurve.unencode(dis, term, dateCache)
 
-        keyBuilder += term
-        curveBuilder += curve
+        if(curve.data.sum > 0) {
+          keyBuilder += term
+          curveBuilder += curve
+        }
 
         i+=1
       }
@@ -221,7 +223,9 @@ object CurveDataBuilder {
     val relevantTerms = Util.timed("brute-force search; gen relevant", {
       bfSearch.run(query, numRelevant).map(_.term).toSet
     })
+    bfSearch.run(query, numPossible).take(10).foreach(println)
     assert(relevantTerms.contains(query))
+
 
     // now evaluate the search method in currentSearch
     //val currentSearch: CurveSearch = binLSHSearch
