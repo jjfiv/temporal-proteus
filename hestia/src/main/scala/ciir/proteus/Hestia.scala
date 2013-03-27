@@ -213,17 +213,17 @@ object CurveDataBuilder {
     val originalVocab = vocab.freqData
 
     val bfSearch = new BruteForceSearch(curveMaker, originalVocab)
-    val binLSHSearch = new BinaryLSHSearch(curveMaker, originalVocab)
+    val lshSearch = new LSHSearch(curveMaker, originalVocab)
 
     val query = "lincoln"
+    val assumedRelevant = 100
     val numRelevant = 100
     val numPossible = originalVocab.size
 
     // use the brute-force search as our ground truth to select the top 100 terms and call these relevant
     val relevantTerms = Util.timed("brute-force search; gen relevant", {
-      bfSearch.run(query, numRelevant).map(_.term).toSet
+      bfSearch.run(query, assumedRelevant).map(_.term).toSet
     })
-    bfSearch.run(query, numPossible).take(10).foreach(println)
     assert(relevantTerms.contains(query))
 
 
@@ -239,17 +239,17 @@ object CurveDataBuilder {
         currentSearch.run(query, numPossible).map(_.term)
       })
       
-      //val retrievedTerms = rankedList.take(numRelevant).toSet
+      val retrievedTerms = rankedList.take(numRelevant).toSet
       // take as many as necessary to find all relevant documents
-      var relCount = 0
-      var retCount = 0
-      while(relCount < numRelevant && retCount < rankedList.size) {
-        if(relevantTerms.contains(rankedList(retCount))) {
-          relCount += 1
-        }
-        retCount += 1
-      }
-      val retrievedTerms = rankedList.take(retCount).toSet
+      //var relCount = 0
+      //var retCount = 0
+      //while(relCount < numRelevant && retCount < rankedList.size) {
+      //  if(relevantTerms.contains(rankedList(retCount))) {
+      //    relCount += 1
+      //  }
+      //  retCount += 1
+      //}
+      //val retrievedTerms = rankedList.take(retCount).toSet
 
       
       val rrTerms = relevantTerms.intersect(retrievedTerms)
@@ -269,8 +269,7 @@ object CurveDataBuilder {
         topRank, Util.fraction(1, topRank))
     }
 
-    evaluate(binLSHSearch)
-    evaluate(new LSHSearch(curveMaker, originalVocab))
+    evaluate(lshSearch)
   }
 }
 

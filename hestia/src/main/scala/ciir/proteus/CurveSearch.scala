@@ -51,35 +51,9 @@ class BruteForceSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve])
   def name = "Brute Force Search"
 }
 
-class BinaryLSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) extends CurveSearch {
-  var randomizer = new util.Random(13)
-  val randomPlane = curveMaker.fromData("hash0", curveMaker.domain.map(x => randomizer.nextInt).toArray)
-
-  val (vocabTrue, vocabFalse) = Util.timed("BinaryLSH", {
-    corpus.partition(hash)
-  })
-
-  def hash(curve: TimeCurve) = { curve.classify(randomPlane) }
-
-  def run(query: String, numResults: Int) = {
-    val queryCurve = curveMaker.search(query)
-    var rl = new RankedList(numResults)
-
-    val data = if (hash(queryCurve)) { vocabTrue } else { vocabFalse }
-
-    data.foreach(timeCurve => {
-      rl.insert(ScoredTerm(timeCurve.term, queryCurve.score(timeCurve)))
-    })
-
-    rl.done
-  }
-
-  def name = "Binary LSH - only two buckets, no overlap"
-}
-
 class LSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) extends CurveSearch {
   val numBits = 4
-  val numBucketSets = 3
+  val numBucketSets = 8
   var randomizer = new util.Random(13)
 
   def allBucketSets = 0 until numBucketSets 
@@ -89,11 +63,14 @@ class LSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) extend
   // generate random planes with max values
   val maxValues = curveMaker.maxArray
   
+  def absInt(x: Int): Int = if (x < 0) -x else x
+  def lshBit(x: Int): Int = if (x < 0) -1 else 1
   
   // generate curve using max values (leads to more uneven buckets, but try this with more than one query)
-  def generateRandomCurve(index: Int) = maxValues.map(maxForYear => if (maxForYear == 0) 1 else (randomizer.nextInt % maxForYear))
+  def generateRandomCurve(index: Int) = maxValues.map(maxForYear => if (maxForYear == 0) 1 else (lshBit(randomizer.nextInt)))
+  //def generateRandomCurve(index: Int) = maxValues.map(maxForYear => if (maxForYear == 0) 1 else ((randomizer.nextInt) % maxForYear))
   
-  //def generateRandomCurve(index: Int) = maxValues.map(ignored => randomizer.nextInt)
+  //def generateRandomCurve(index: Int) = maxValues.map(ignored => absInt(randomizer.nextInt))
   
   val hashPlanes: IndexedSeq[IndexedSeq[TimeCurve]] = allBucketSets.map(ignored => {
     allBucketBits.map(index => {
@@ -119,6 +96,7 @@ class LSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) extend
     
     val buckets = bucketBuilders.map(_.map(_.result.toSet).toArray).toArray
     
+    /*
     println("Bucket overview:")
     buckets.foreach {
       bset => println("Set::");
@@ -126,6 +104,7 @@ class LSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) extend
         bkt => println("  B: "+ bkt.size)
       }
     }
+    */
 
     buckets
   }
