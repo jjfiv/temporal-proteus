@@ -212,7 +212,9 @@ object CurveDataBuilder {
     val numPossible = originalVocab.size
 
     // use the brute-force search as our ground truth to select the top 100 terms and call these relevant
-    val relevantTerms = bfSearch.run(query, numRelevant).map(_.term).toSet
+    val relevantTerms = Util.timed("brute-force search; gen relevant", {
+      bfSearch.run(query, numRelevant).map(_.term).toSet
+    })
     assert(relevantTerms.contains(query))
 
     // now evaluate the search method in currentSearch
@@ -220,9 +222,12 @@ object CurveDataBuilder {
 
     def evaluate(currentSearch: CurveSearch) {
       println("")
+      println("Evaluate: "+currentSearch.name)
       println("==")
 
-      val rankedList = currentSearch.run(query, numPossible).map(_.term)
+      val rankedList = Util.timed("search runtime", {
+        currentSearch.run(query, numPossible).map(_.term)
+      })
       
       //val retrievedTerms = rankedList.take(numRelevant).toSet
       // take as many as necessary to find all relevant documents
@@ -255,6 +260,7 @@ object CurveDataBuilder {
     }
 
     evaluate(binLSHSearch)
+    evaluate(new LSHSearch(curveMaker, originalVocab))
     evaluate(new SampledSearch(curveMaker, originalVocab))
   }
 }
