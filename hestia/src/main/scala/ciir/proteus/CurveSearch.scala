@@ -53,32 +53,23 @@ class BruteForceSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve])
 
 class LSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) extends CurveSearch {
   val numBits = 4
-  val numBucketSets = 8
-  var randomizer = new util.Random(13)
+  val numBucketSets = 2
+  val numBuckets = (1 << numBits)
+  var randomizer = new util.Random(14)
 
   def allBucketSets = 0 until numBucketSets 
   def allBucketBits = 0 until numBits
-  def allBuckets = 0 until (1 << numBits)
+  def allBuckets = 0 until numBuckets
   
-  // generate random planes with max values
-  val maxValues = curveMaker.maxArray
-  
-  def absInt(x: Int): Int = if (x < 0) -x else x
-  def lshBit(x: Int): Int = if (x < 0) -1 else 1
-  
-  // generate curve using max values (leads to more uneven buckets, but try this with more than one query)
-  def generateRandomCurve(index: Int) = maxValues.map(maxForYear => if (maxForYear == 0) 1 else (lshBit(randomizer.nextInt)))
-  //def generateRandomCurve(index: Int) = maxValues.map(maxForYear => if (maxForYear == 0) 1 else ((randomizer.nextInt) % maxForYear))
-  
-  //def generateRandomCurve(index: Int) = maxValues.map(ignored => absInt(randomizer.nextInt))
-  
-  val hashPlanes: IndexedSeq[IndexedSeq[TimeCurve]] = allBucketSets.map(ignored => {
-    allBucketBits.map(index => {
-      curveMaker.fromData("hash"+index, generateRandomCurve(index).toArray)
+  def boolToSign(b: Boolean): Int = if (b) -1 else 1
+  val hashPlanes: IndexedSeq[IndexedSeq[Array[Int]]] = allBucketSets.map(bktSet => {
+    allBucketBits.map(bkt => {
+      // generate random boolean vectors of the correct size
+      curveMaker.domain.map(x=>boolToSign(randomizer.nextBoolean)).toArray
     })
   })
 
-  val hashBuckets: Array[Array[Set[Int]]] = buildBucketsFromCorpus()
+  val hashBuckets: Array[Array[Set[Int]]] = Util.timed("Bucket whole corpus", { buildBucketsFromCorpus() })
   
   private def buildBucketsFromCorpus() = {
     // make numBucketSets * (2^numBits) bucket builders...
@@ -86,13 +77,14 @@ class LSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) extend
       allBuckets.map(bktno => Array.newBuilder[Int])
     })
 
-    corpus.zipWithIndex.foreach({ case Tuple2(timeCurve, index) => {
+    corpus.indices.foreach(
+      index => {
+      val timeCurve = corpus(index)
       allBucketSets.foreach(bktSetNo => {
         val bucketNumber = hash(bktSetNo, timeCurve)
-        assert(bucketNumber >= 0 && bucketNumber < (1 << numBits))
         bucketBuilders(bktSetNo)(bucketNumber) += index
       })
-    }})
+    })
     
     val buckets = bucketBuilders.map(_.map(_.result.toSet).toArray).toArray
     
@@ -109,28 +101,28 @@ class LSHSearch(val curveMaker: CurveMaker, val corpus: Array[TimeCurve]) extend
     buckets
   }
 
-  def boolsToIntBits(bools: Seq[Boolean]) = {
-    assert(bools.size == numBits)
+  def hash(bktSetNo:Int, curve: TimeCurve): Int = { 
     var mask = 0
-    bools.foreach(b => {
-      mask <<= 1;
-      mask |= (if (b) 1 else 0)
-    })
-    mask
-  }
 
-  def hash(bktSetNo:Int, curve: TimeCurve) = { 
-    boolsToIntBits(hashPlanes(bktSetNo).map(_.classify(curve)))
+    hashPlanes(bktSetNo).foreach(bkt => {
+      mask <<= 1
+      if(curve.classify(bkt)) {
+        mask |= 1
+      }
+    })
+
+    mask
   }
 
   def run(query: String, numResults: Int) = {
     val queryCurve = curveMaker.search(query)
     var rl = new RankedList(numResults)
 
-
     val data = allBucketSets.map(bktSetNo => {
       hashBuckets(bktSetNo)(hash(bktSetNo, queryCurve))
-    }).foldLeft(Set.empty[Int])((accum, cur) => { accum | cur })
+    }).foldLeft(Set.empty[Int])(_ | _)
+
+    println("Reduced Search Set: " + data.size + " / " + corpus.size)
 
     data.foreach(index => {
       val timeCurve = corpus(index)

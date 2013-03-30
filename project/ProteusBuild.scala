@@ -35,7 +35,7 @@ object ProteusBuild extends Build {
   lazy val hestia = Project(
     id = "hestia",
     base = file("hestia"),
-    settings = buildSettings ++ Seq(resolvers := Resolvers.all, libraryDependencies ++= HestiaDeps.deps)
+    settings = buildSettings ++ Seq(resolvers := Resolvers.all, libraryDependencies ++= CommonDeps.galagoDeps)
   ) dependsOn (aura, morpheus)
 }
 
@@ -85,25 +85,6 @@ object AuraDeps {
 
   def deps = Seq(thriftLib, finagleCore, finagleThrift, ostrich, scroogeRuntime,
 	       gson, logback) ++ CommonDeps.galagoDeps
-}
-
-object HestiaDeps {
-  val modelHost = "edu.washington.cs.knowitall.stanford-corenlp";
-  val stNLPVersion = "1.3.4";
-
-  val stanfordNLP = "edu.stanford.nlp" % "stanford-corenlp" % stNLPVersion
-  
-  val stanfordNLPModels = Seq(
-      modelHost % "stanford-postag-models" % stNLPVersion,
-      modelHost % "stanford-parse-models" % stNLPVersion,
-      modelHost % "stanford-ner-models" % stNLPVersion,
-      modelHost % "stanford-dcoref-models" % stNLPVersion,
-      modelHost % "stanford-sutime-models" % stNLPVersion
-    );
-
-  //val charting = Seq("jfree" % "jfreechart" % "1.0.2")
-
-  def deps = Seq(stanfordNLP) ++ stanfordNLPModels ++ CommonDeps.galagoDeps
 }
 
 object MorpheusDeps {

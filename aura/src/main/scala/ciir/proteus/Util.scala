@@ -55,6 +55,13 @@ object Util {
     }
   }
   def harmonicMean(a: Double, b: Double) = { (2*a*b) / (a+b) }
+  def loopUntil(max: Int)(op: Int=>Unit) {
+    var i=0
+    while(i < max) {
+      op(i)
+      i+=1
+    }
+  }
 }
 
 object GalagoIndexUtil {

@@ -98,7 +98,7 @@ class Vocabulary(var dateCache: DateCache, val fileStore: String, var retrieval:
 
       var i=0
       while(i < count) {
-        if(i % 10000 == 0) { println("load vocab "+i); }
+        //if(i % 10000 == 0) { println("load vocab "+i); }
 
         val term = dis.readUTF
         val curve = TimeCurve.unencode(dis, term, dateCache)
@@ -215,7 +215,7 @@ object CurveDataBuilder {
     val bfSearch = new BruteForceSearch(curveMaker, originalVocab)
     val lshSearch = new LSHSearch(curveMaker, originalVocab)
 
-    val query = "lincoln"
+    val query = "franklin"
     val assumedRelevant = 100
     val numRelevant = 100
     val numPossible = originalVocab.size
@@ -269,6 +269,7 @@ object CurveDataBuilder {
         topRank, Util.fraction(1, topRank))
     }
 
+    evaluate(bfSearch)
     evaluate(lshSearch)
   }
 }
